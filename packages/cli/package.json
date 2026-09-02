@@ -7,14 +7,17 @@
   "bin": {
     "roxyon": "./bin/roxyon.js"
   },
-  "files": ["dist", "bin"],
+  "files": ["dist", "bin", "LICENSE"],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "node --experimental-strip-types src/index.ts"
+    "dev": "node --experimental-strip-types src/index.ts",
+    "prepublishOnly": "tsup"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "keywords": ["roxyon", "lumenjs", "deploy", "baas", "paas", "cli"],
   "repository": {
     "type": "git",
@@ -33,5 +36,8 @@
     "tsup": "^8.3.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

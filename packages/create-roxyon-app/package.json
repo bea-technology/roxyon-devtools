@@ -4,14 +4,19 @@
   "description": "Scaffold a Roxyon project — LumenJS SPA or a Node app — wired for `roxyon deploy`, with AGENTS.md / llms.txt / editor rules so any AI assistant gets it right.",
   "license": "MIT",
   "type": "module",
-  "bin": { "create-roxyon-app": "./bin/create-roxyon-app.js" },
-  "files": ["dist", "bin", "templates"],
+  "bin": {
+    "create-roxyon-app": "./bin/create-roxyon-app.js"
+  },
+  "files": ["dist", "bin", "LICENSE"],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "tsup"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "keywords": ["roxyon", "lumenjs", "scaffold", "create", "starter"],
   "repository": {
     "type": "git",
