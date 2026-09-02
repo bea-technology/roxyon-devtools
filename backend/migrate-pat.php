@@ -5,8 +5,10 @@
  *   php /var/www/console/exec/migrate-pat.php
  *
  * Idempotent — creating a class that exists is a no-op, and createFields skips
- * columns that already exist. Talks to the node's BaaS (private IP :9000, the
- * master key server_setup.php uses); run it on any one app node.
+ * columns that already exist. Talks to the node's BaaS (private IP :9000). The
+ * App-ID + REST key are read from /var/www/console/libs/server_setup.php on the
+ * node (or from BAAS_APP_ID / BAAS_REST_KEY) — this file carries no secrets.
+ * Run it on any one app node.
  *
  * Columns (all string / VARCHAR(500)):
  *   User          Users.objectId the token acts as
@@ -26,10 +28,26 @@ if (!$host) {
 $BASE = "http://{$host}:9000/1";
 fwrite(STDERR, "using BaaS at {$BASE}\n");
 
+// The console's App-ID + REST (master) key. On a node they are in
+// libs/server_setup.php — read them from there so this script carries no
+// secrets, or override with BAAS_APP_ID / BAAS_REST_KEY.
+$appId  = getenv('BAAS_APP_ID') ?: null;
+$restKey = getenv('BAAS_REST_KEY') ?: null;
+$setup = '/var/www/console/libs/server_setup.php';
+if ((!$appId || !$restKey) && is_readable($setup)) {
+    $src = (string) file_get_contents($setup);
+    if (!$restKey && preg_match("/'X-BEA-Authorization'\s*=>\s*'([^']+)'/", $src, $m)) $restKey = $m[1];
+    if (!$appId && preg_match("/'X-BEA-Application-Id'\s*=>\s*'([^']+)'/i", $src, $m)) $appId = $m[1];
+}
+if (!$appId || !$restKey) {
+    fwrite(STDERR, "set BAAS_APP_ID and BAAS_REST_KEY (or run where {$setup} is readable)\n");
+    exit(1);
+}
+
 $HEADERS = [
     'Content-Type: application/json',
-    'X-BEA-Authorization: REDACTED_SET_BAAS_REST_KEY_ENV',
-    'X-BEA-Application-Id: jAtp2zHGU3FbnrQWrToALFakd_vbiY0ywihn4Hj54lw',
+    "X-BEA-Authorization: {$restKey}",
+    "X-BEA-Application-Id: {$appId}",
 ];
 
 function call(string $method, string $url, ?array $body, array $headers): array
