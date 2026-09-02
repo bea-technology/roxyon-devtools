@@ -21,9 +21,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
 
       - uses: actions/setup-node@v4
         with:
@@ -39,6 +37,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm test
 
       # Opens/updates a "Version Packages" PR from pending changesets; when that
       # PR is merged, this same job runs `pnpm release` and publishes.
