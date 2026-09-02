@@ -37,15 +37,15 @@ publish private.
 2. Merge that PR → the workflow bumps versions, writes CHANGELOGs, and
    **publishes to npm** and **updates the MCP registry**.
 
-No tokens if you set up **OIDC trusted publishing** (recommended):
+**Tokenless** — OIDC trusted publishing is configured for all five packages
+(npmjs.com → each package → Settings → Trusted Publisher → GitHub Actions →
+`bea-technology/roxyon-devtools` / `release.yml`, "Allowed actions" = publish).
+The workflow has `permissions: id-token: write` and installs `npm@latest`, so
+`changeset publish` gets its npm credential from GitHub OIDC. No `NPM_TOKEN`
+secret. The MCP registry publish is OIDC too (`io.github.bea-technology/*`).
 
-- npm: each package → Settings → **Trusted Publisher** → GitHub Actions,
-  repo `bea-technology/roxyon-devtools`, workflow `release.yml`.
-- MCP registry: nothing to configure — the workflow authenticates with GitHub
-  OIDC for the `io.github.bea-technology/*` namespace.
-
-Fallback if you skip OIDC: add an `NPM_TOKEN` repo secret (granular, write to the
-`@roxyon` scope + `create-roxyon-app`) — the workflow picks it up.
+Because the npm org enforces 2FA, **manual `pnpm publish` now needs an
+interactive `npm login` + `--otp`** — prefer the CI flow.
 
 ### Cutting a release
 
