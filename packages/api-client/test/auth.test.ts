@@ -55,6 +55,34 @@ describe('AuthApi.login', () => {
     expect(res.sessionToken).toBe('');
   });
 
+  it('never sends X-BEA-Application-ID on an authenticated request', async () => {
+    // The BaaS `/auth/*` router short-circuits to anon-token minting whenever
+    // the App-ID header is present — so login/me/logout must not send it.
+    const seen: Array<{ url: string; hasAppId: boolean }> = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const h = new Headers(init?.headers);
+      seen.push({ url, hasAppId: h.has('x-bea-application-id') });
+      if (url.endsWith('/Auth') && !url.endsWith('/login')) {
+        return json({ access_token: 'anon', expires_in: 3600 });
+      }
+      if (url.endsWith('/_account/login-precheck')) return json({ ok: true });
+      if (url.endsWith('/Auth/login')) return json({ session_token: 's', expires_in: 3600 });
+      if (url.endsWith('/Auth/me')) return json({ objectId: 'u1', Email: 'a@b.c' });
+      return json({});
+    });
+    const client = new RoxyonClient({ fetch: fetchImpl as unknown as typeof fetch });
+    const auth = new AuthApi(client);
+    await auth.login('a@b.com', 'pw');
+    await auth.me();
+
+    const mint = seen.find((s) => s.url.endsWith('/Auth') && !s.url.endsWith('/login'))!;
+    expect(mint.hasAppId).toBe(true); // the anon mint DOES carry App-ID + JS key
+    for (const s of seen.filter((x) => x !== mint)) {
+      expect(s.hasAppId, s.url).toBe(false);
+    }
+  });
+
   it('throws on bad credentials at precheck', async () => {
     const client = mockClient((url) => {
       if (url.endsWith('/_account/login-precheck'))

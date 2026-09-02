@@ -112,18 +112,22 @@ export class RoxyonClient {
     skipAuth: boolean,
     isConsole: boolean,
   ): Promise<Record<string, string>> {
-    const base: Record<string, string> = { [H.appId]: this.appId };
-    if (skipAuth) return base;
+    // IMPORTANT: never send X-BEA-Application-ID on an authenticated request.
+    // The BaaS `/auth/*` router treats the App-ID header as "mint me an
+    // anonymous token" and short-circuits — /Auth/login, /Auth/me etc. would
+    // silently return a fresh anon token instead of doing their job. The App-ID
+    // (+ JS key) is sent only by anonToken()'s own POST /Auth call.
+    if (skipAuth) return {};
     if (this.isPat) {
-      // Console: Bearer. BaaS: nothing useful — PAT clients resolve identity and
+      // Console: Bearer. BaaS: nothing — PAT clients resolve identity and
       // subscriptions through the console's /account/context instead.
-      return isConsole ? { ...base, authorization: `Bearer ${this.sessionToken}` } : base;
+      return isConsole ? { authorization: `Bearer ${this.sessionToken}` } : {};
     }
-    if (this.sessionToken) return { ...base, [H.sessionToken]: this.sessionToken };
-    if (this.restKey) return { ...base, [H.restKey]: this.restKey };
+    if (this.sessionToken) return { [H.sessionToken]: this.sessionToken };
+    if (this.restKey) return { [H.appId]: this.appId, [H.restKey]: this.restKey };
     const anon = await this.anonToken();
-    if (anon.session_token) return { ...base, [H.sessionToken]: anon.session_token };
-    return { ...base, [H.accessToken]: anon.access_token ?? '' };
+    if (anon.session_token) return { [H.sessionToken]: anon.session_token };
+    return { [H.accessToken]: anon.access_token ?? '' };
   }
 
   /** A raw BaaS request. `path` is relative to {@link baseUrl} (leading `/`). */
