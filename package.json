@@ -14,7 +14,7 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "changeset": "changeset",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && pnpm -r publish --no-git-checks"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

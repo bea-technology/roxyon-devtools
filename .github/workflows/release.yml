@@ -14,8 +14,6 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    outputs:
-      published: ${{ steps.changesets.outputs.published }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -30,17 +28,18 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       # npm >= 11.5.1 is needed for OIDC "trusted publishing" (no NPM_TOKEN).
-      # Configure it once per package at npmjs.com → package → Settings →
-      # Trusted Publisher → GitHub Actions (repo bea-technology/roxyon-devtools,
-      # workflow release.yml).
+      # Configured per package at npmjs.com → package → Settings → Trusted
+      # Publisher → GitHub Actions (bea-technology/roxyon-devtools, release.yml).
       - run: npm install -g npm@latest
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
 
-      # Opens/updates a "Version Packages" PR from pending changesets; when that
-      # PR is merged, this same job runs `pnpm release` and publishes.
+      # With pending changesets: opens/updates the "chore: version packages" PR.
+      # After that PR merges (no changesets on the merge commit): runs
+      # `pnpm release` = build + `pnpm -r publish` (rewrites workspace:* deps,
+      # skips already-published versions, exits 0 when there is nothing new).
       - name: Changesets
         id: changesets
         uses: changesets/action@v1
@@ -52,32 +51,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
-          # No NODE_AUTH_TOKEN: publishing uses OIDC trusted publishing
-          # (each package → npmjs.com → Settings → Trusted Publisher →
-          # GitHub Actions → bea-technology/roxyon-devtools / release.yml).
-          # `permissions: id-token: write` above + npm@latest make it tokenless.
+          # No NODE_AUTH_TOKEN: publishing uses OIDC trusted publishing.
 
-  mcp-registry:
-    needs: release
-    if: needs.release.outputs.published == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write # GitHub OIDC → MCP registry (io.github.* namespace)
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-      - name: Sync server.json version from @roxyon/mcp
+      # Keep the MCP registry in step with the published @roxyon/mcp version.
+      # No-ops on every ordinary push (versions already match); only publishes
+      # after a release bumped it. Manual re-run: Actions → "Publish to MCP Registry".
+      - name: Update MCP registry
         run: |
-          V=$(node -p "require('./packages/mcp-server/package.json').version")
+          MCP_V=$(node -p "require('./packages/mcp-server/package.json').version")
+          REG_V=$(curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=roxyon" \
+            | node -p "JSON.parse(require('fs').readFileSync(0)).servers?.[0]?.server?.version || ''")
+          if [ "$MCP_V" = "$REG_V" ]; then echo "registry already at $MCP_V — nothing to do"; exit 0; fi
           node -e "
             const f='integrations/mcp-registry/server.json';
             const j=require('./'+f);
-            j.version='$V'; j.packages[0].version='$V';
-            require('fs').writeFileSync(f, JSON.stringify(j,null,2)+'\n');
+            j.version='$MCP_V'; j.packages[0].version='$MCP_V';
+            require('fs').writeFileSync(f, JSON.stringify(j, null, 2) + '\n');
           "
-      - name: Publish to the MCP registry
-        run: |
-          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
-            | tar xz mcp-publisher
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar -xz mcp-publisher
+          chmod +x ./mcp-publisher
           ./mcp-publisher login github-oidc
-          ./mcp-publisher publish integrations/mcp-registry/server.json
+          ./mcp-publisher publish ./integrations/mcp-registry/server.json
