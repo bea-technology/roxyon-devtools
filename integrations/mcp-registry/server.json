@@ -3,7 +3,7 @@
   "name": "io.github.bea-technology/roxyon",
   "description": "Build LumenJS apps, use the Roxyon BaaS, and deploy apps and web projects to Roxyon infrastructure.",
   "status": "active",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "url": "https://github.com/bea-technology/roxyon-devtools",
     "source": "github",
@@ -13,9 +13,11 @@
     {
       "registryType": "npm",
       "identifier": "@roxyon/mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "npx",
-      "transport": { "type": "stdio" },
+      "transport": {
+        "type": "stdio"
+      },
       "environmentVariables": [
         {
           "name": "ROXYON_TOKEN",

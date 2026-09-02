@@ -1,10 +1,13 @@
+import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerPrompts } from './prompts.js';
 import { registerResources } from './resources.js';
 import { registerTools } from './tools.js';
 
 export const SERVER_NAME = 'roxyon';
-export const SERVER_VERSION = '0.1.0';
+export const SERVER_VERSION: string = (
+  createRequire(import.meta.url)('../package.json') as { version: string }
+).version;
 
 /** Build the Roxyon MCP server with every tool, resource and prompt registered. */
 export function createServer(): McpServer {

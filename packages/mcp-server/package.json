@@ -1,6 +1,7 @@
 {
   "name": "@roxyon/mcp",
-  "version": "0.1.0",
+  "mcpName": "io.github.bea-technology/roxyon",
+  "version": "0.1.1",
   "description": "Model Context Protocol server for Roxyon — lets any MCP-capable AI assistant build with LumenJS, use the Roxyon BaaS, and deploy to Roxyon infrastructure.",
   "license": "MIT",
   "type": "module",
