@@ -1,6 +1,6 @@
 {
   "name": "@roxyon/api-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Typed client for the Roxyon BaaS (RX engine) and the Roxyon Applications deploy API.",
   "license": "MIT",
   "type": "module",
