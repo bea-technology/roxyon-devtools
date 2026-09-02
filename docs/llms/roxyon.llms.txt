@@ -1,0 +1,32 @@
+# Roxyon
+
+> Roxyon is an application hosting platform with a built-in Backend-as-a-Service
+> (the "RX" engine). Developers deploy web apps and long-running Node.js / Python
+> / PHP applications from a local folder or a GitHub repo, and use the BaaS for
+> data, auth, storage and functions. The `@roxyon/cli` and the Roxyon MCP server
+> let an AI assistant do all of this directly.
+
+## Start here
+
+- [Deploy from any AI assistant](https://roxyon.com/llms/deploy.md): the CLI, the MCP server, and `roxyon.json`.
+- [BaaS reference](https://roxyon.com/llms/baas.md): REST endpoints, auth flow, query rules, the resolve-on-failure write behaviour.
+- [OpenAPI spec](https://roxyon.com/openapi.yaml): machine-readable BaaS + deploy API (OpenAPI 3.1).
+
+## Tooling
+
+- [@roxyon/cli](https://www.npmjs.com/package/@roxyon/cli): `roxyon login | init | deploy | logs | env | link`. `npm i -g @roxyon/cli`.
+- [@roxyon/mcp](https://www.npmjs.com/package/@roxyon/mcp): MCP server. Add `{ "command": "npx", "args": ["-y", "@roxyon/mcp"] }` to any MCP client.
+- [@roxyon/api-client](https://www.npmjs.com/package/@roxyon/api-client): typed TS client for the BaaS and the deploy endpoints.
+
+## Deploy model
+
+- Static (LumenJS `--serverless` build, any static output) → files land in the host document root, served by nginx.
+- App (Node/Python/PHP) → an `Applications` row + a systemd unit; source is uploaded, a reconciler builds it in an isolated release directory and runs it.
+- `roxyon.json` at the project root records host, folder, runtime and build command. `roxyon init` writes it.
+- Environment variables live on the platform (`roxyon env set`), not in `roxyon.json`. `PORT` and `HOST` are platform-managed.
+- Git push-to-deploy: `roxyon link` connects a repo and returns a deploy key + webhook.
+
+## LumenJS
+
+- [LumenJS reference](https://lumenjs.com/llms/lumenjs.md): full V1 reference — build SPAs with vanilla JS/HTML/CSS, no build step.
+- Pair it with the Roxyon BaaS for the backend and `roxyon deploy` (static) to ship it.

@@ -1,0 +1,458 @@
+openapi: 3.1.0
+info:
+  title: Roxyon BaaS + Deploy API
+  version: "1.0.0"
+  summary: Data, auth, and deploy API for the Roxyon platform (the "RX" engine).
+  description: |
+    The Roxyon Backend-as-a-Service is a Parse-Server-style data + auth backend.
+
+    ## Authentication
+
+    Every request carries `X-BEA-Application-ID`. A public client (browser, CLI)
+    also sends `X-BEA-JavaScript-Key` once to mint an anonymous token via
+    `POST /Auth`, then sends `X-BEA-Session-Token` (a logged-in user) or
+    `X-BEA-Access-Token` (anonymous) on subsequent calls. `X-BEA-Authorization`
+    carries the server-only REST key — never ship it to a browser.
+
+    ## Write behaviour — IMPORTANT
+
+    A failed write returns HTTP 200 with an `error` field, either at the top
+    level or inside a `results[]` entry. Clients MUST check for `error` before
+    treating a write as successful; the HTTP status is not reliable for this.
+
+    ## Query rules
+
+    - `where` is passed as nested query params (`where[Field]=value`,
+      `where[Field][op]=value`), serialised the way PHP `http_build_query`
+      produces — not as a JSON string.
+    - The `in` operator takes a **comma-joined string**: `where[Id][in]=a,b,c`.
+      An array serialises to bracket-index keys the API ignores.
+    - A `select` sub-query nested inside an `or` group crashes the API — resolve
+      ids first, then `or:[..., {objectId:{in:"a,b"}}]`.
+    - `objectId` is unique per class, not globally.
+
+servers:
+  - url: https://www.beaapis.com/1
+    description: Roxyon BaaS
+  - url: https://console.roxyon.com
+    description: Console app endpoints (deploy)
+
+security:
+  - AppId: []
+    SessionToken: []
+
+components:
+  securitySchemes:
+    AppId:
+      type: apiKey
+      in: header
+      name: X-BEA-Application-ID
+    JavaScriptKey:
+      type: apiKey
+      in: header
+      name: X-BEA-JavaScript-Key
+    SessionToken:
+      type: apiKey
+      in: header
+      name: X-BEA-Session-Token
+    AccessToken:
+      type: apiKey
+      in: header
+      name: X-BEA-Access-Token
+    RestKey:
+      type: apiKey
+      in: header
+      name: X-BEA-Authorization
+
+  schemas:
+    TokenGrant:
+      type: object
+      properties:
+        access_token: { type: string }
+        session_token: { type: string }
+        refresh_token: { type: string }
+        expires_in: { type: integer, description: seconds }
+    AuthError:
+      type: object
+      properties:
+        code: { type: integer }
+        error: { type: string }
+        type: { type: string }
+    User:
+      type: object
+      required: [objectId]
+      properties:
+        objectId: { type: string }
+        Email: { type: string }
+        Username: { type: string }
+    WriteResult:
+      description: >
+        results[] carries the written row, OR an {error} object on failure
+        (still HTTP 200 — check for `error`).
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              objectId: { type: string }
+              error: { type: string }
+              code: { type: integer }
+        error: { type: string }
+    QueryResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items: { type: object, additionalProperties: true }
+        count: { type: integer }
+        error: { type: string }
+
+paths:
+  /Auth:
+    post:
+      operationId: mintAnonymousToken
+      summary: Mint an anonymous access token
+      security: [{ AppId: [], JavaScriptKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { scope: { type: string, enum: [public] } }
+      responses:
+        "200":
+          description: token grant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenGrant" }
+
+  /Auth/login:
+    post:
+      operationId: login
+      summary: Log in with email + password
+      description: Returns a session token, or an object with no `session_token` (and usually a `code`/`error`) on failure.
+      security: [{ AppId: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Email, Password]
+              properties:
+                Email: { type: string }
+                Password: { type: string }
+                metadata: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: session grant or failure
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TokenGrant"
+                  - $ref: "#/components/schemas/AuthError"
+
+  /Auth/login/otp:
+    post:
+      operationId: startOtpLogin
+      summary: Begin a one-time-code sign-in
+      security: [{ AppId: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Email]
+              properties: { Email: { type: string } }
+      responses:
+        "200":
+          description: challenge issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { challengeId: { type: string } }
+
+  /Auth/login/otp-verify:
+    post:
+      operationId: verifyOtp
+      summary: Complete an OTP sign-in (also used for password step-up)
+      security: [{ AppId: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, code]
+              properties:
+                challengeId: { type: string }
+                code: { type: string }
+      responses:
+        "200":
+          description: authenticated (status="authenticated") + token grant, or an error
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TokenGrant"
+                  - type: object
+                    properties: { status: { type: string, enum: [authenticated] } }
+
+  /Auth/me:
+    post:
+      operationId: currentUser
+      summary: The user for the presented session token
+      description: >
+        Send ONLY the session/access token (no JS key, no REST key) — those turn
+        this into a token-exchange call instead of an identity call. A rejected
+        token answers 200 with `{failed:true}` and no `objectId`.
+      security: [{ SessionToken: [] }]
+      responses:
+        "200":
+          description: user or refusal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+
+  /Auth/logout:
+    post:
+      operationId: logout
+      summary: Invalidate the current session
+      security: [{ SessionToken: [] }]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { success: { type: boolean } }
+
+  /Auth/register:
+    post:
+      operationId: register
+      summary: Create a user and sign them in
+      security: [{ AppId: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [Email, Password]
+              properties:
+                Email: { type: string }
+                Password: { type: string }
+      responses:
+        "200":
+          description: token grant, or the created row / an error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TokenGrant"
+                  - $ref: "#/components/schemas/WriteResult"
+
+  /{className}:
+    parameters:
+      - name: className
+        in: path
+        required: true
+        schema: { type: string }
+        description: A data class, e.g. `Applications`, `Domains`, `Privileges`, or your own.
+    get:
+      operationId: queryClass
+      summary: Query rows
+      parameters:
+        - name: where
+          in: query
+          description: "Nested filter, e.g. where[Status]=running or where[Id][in]=a,b,c. NOT JSON."
+          schema: { type: object, additionalProperties: true }
+          style: deepObject
+          explode: true
+        - name: fields
+          in: query
+          schema: { type: string }
+          description: Comma-separated field list; `*` for all.
+        - name: limit
+          in: query
+          schema: { type: integer }
+          description: "-1 = no limit; 0 = none (use with count=1)."
+        - name: order
+          in: query
+          schema: { type: string }
+        - name: include
+          in: query
+          description: Pointer / reverse-include expansion (see the BaaS reference).
+          schema: { type: string }
+        - name: count
+          in: query
+          schema: { type: integer, enum: [0, 1] }
+      responses:
+        "200":
+          description: rows
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QueryResult" }
+    post:
+      operationId: createRow
+      summary: Create a row
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: created row, OR {error} (still 200 — check for `error`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriteResult" }
+    put:
+      operationId: updateRow
+      summary: Update a row
+      description: The body MUST include `objectId`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectId]
+              additionalProperties: true
+      responses:
+        "200":
+          description: updated row, OR {error} (still 200)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriteResult" }
+    delete:
+      operationId: deleteRow
+      summary: Delete a row
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectId]
+              properties: { objectId: { type: string } }
+      responses:
+        "200":
+          description: ok, OR {error}
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriteResult" }
+
+  /batch:
+    post:
+      operationId: batch
+      summary: Run several data operations in one request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requests:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      path: { type: string }
+                      method: { type: string }
+                      body: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: array of per-request results
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/QueryResult" }
+
+  /applications/deploy:
+    servers:
+      - url: https://console.roxyon.com
+    post:
+      operationId: deployApplicationSource
+      summary: Upload project source for an application and trigger a build
+      description: >
+        Lands the gzip tarball in the application's `SourcePath` and bumps
+        `ConfigRevision`; the reconciler then builds it in an isolated release
+        directory and swaps it in. Rejects git-connected applications (push
+        instead) and stopped applications.
+      security: [{ SessionToken: [] }]
+      parameters:
+        - name: application
+          in: query
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/gzip:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  application: { type: string }
+                  configRevision: { type: integer }
+                  files: { type: integer }
+                  bytes: { type: integer }
+        "409": { description: git-connected or stopped application }
+        "413": { description: archive over 64 MB }
+
+  /sites/deploy:
+    servers:
+      - url: https://console.roxyon.com
+    post:
+      operationId: deploySite
+      summary: Publish static files to a host document root
+      description: >
+        For LumenJS `--serverless` builds and any other static output. Extracts
+        the gzip tarball into `/home/www/<host>/public_html[/<folder>]`, served
+        by nginx. No build, no process. Overlay semantics — files the archive
+        omits are not deleted.
+      security: [{ SessionToken: [] }]
+      parameters:
+        - name: host
+          in: query
+          required: true
+          schema: { type: string }
+          description: A domain on one of the caller's subscriptions.
+        - name: folder
+          in: query
+          schema: { type: string }
+          description: Optional sub-path under the document root. Empty = site root.
+      requestBody:
+        required: true
+        content:
+          application/gzip:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  host: { type: string }
+                  path: { type: string }
+                  files: { type: integer }
+                  bytes: { type: integer }

@@ -12,11 +12,12 @@ dependency.
 
 | Phase | Deliverable | State |
 |---|---|---|
-| **M1** | `@roxyon/api-client` + `@roxyon/deploy-core` + `@roxyon/cli` (`login/init/deploy/logs/env/…`) | **done** (client + CLI). `POST /applications/deploy` & `POST /sites/deploy` console endpoints still to ship |
+| **M1** | `@roxyon/api-client` + `@roxyon/deploy-core` + `@roxyon/cli` (`login/init/deploy/logs/env/…`) | **done** (client + CLI) |
+| **backend** | `POST /applications/deploy` + `POST /sites/deploy` console endpoints + `app-source-apply.sh` | **written & wired in `_configs/…/clone/`** (`backend/`), not yet synced to nodes |
 | **M1.5** | `PersonalAccessTokens` class + `/_account/tokens` cloud functions; `roxyon token`; Bearer auth on the console endpoints | next |
 | **M2** | `@roxyon/mcp` — MCP server wrapping `@roxyon/api-client` + `@roxyon/deploy-core`. 11 tools, 3 doc resources, 2 prompts. | **stdio done.** Remaining: Streamable-HTTP transport + OAuth (blocked on M1.5 PATs); more tools (`roxyon_provision_database`); registry listings (Anthropic, Cursor, Smithery, Glama, PulseMCP, mcp.so) |
-| **M3** | Docs/knowledge layer: `llms.txt` + flat markdown on `lumenjs.com` & `roxyon.com`; BaaS **OpenAPI 3.1** at `roxyon.com/openapi.json`; publish the existing `lumenjs-spec.md` at `lumenjs.com/llms/lumenjs.md`; shared `runtimes.json`. | |
-| **M4** | `create-roxyon-app` — templates `lumen-spa`, `lumen-baas`, `node-api`, `next`; emits `AGENTS.md`, `roxyon.json`, `llms.txt`, `.cursor/rules`, `.github/copilot-instructions.md`. | |
+| **M3** | Docs/knowledge layer. | **drafted** in `docs/` — `llms/{roxyon,lumenjs}.llms.txt`, `openapi/baas.yaml` (validates), `templates/AGENTS.md`, `DISTRIBUTION.md`. Remaining: host them; publish `lumenjs-spec.md` at `lumenjs.com/llms/lumenjs.md`; shared `runtimes.json` |
+| **M4** | `create-roxyon-app` — templates `lumen-spa`, `lumen-baas`, `node-api`, `next`; emits `AGENTS.md` (from `docs/templates/`), `roxyon.json`, `llms.txt`, `.cursor/rules`, `.github/copilot-instructions.md`. | |
 | **M5** | Platform wrappers: Claude Code plugin (MCP + skills + `/roxyon-deploy`), ChatGPT connector + Custom GPT (OpenAPI Actions), Gemini CLI extension, Cursor/Windsurf/Cline install snippets; promote the git deploy-key/webhook flow into a real "Roxyon" GitHub App. | |
 | **M6** | Open-source everything, tutorials, examples, canonical Q&A — so future model training absorbs LumenJS/Roxyon. | |
 

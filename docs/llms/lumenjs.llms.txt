@@ -1,0 +1,26 @@
+# LumenJS
+
+> LumenJS is a tiny, no-build, no-virtual-DOM reactive framework for building
+> single-page apps with standard HTML, CSS and JavaScript. `.view` files are
+> plain HTML+JS+CSS fetched and interpreted in the browser — there is no
+> compilation step for the framework. It pairs with MobiusCSS for layout
+> utilities and the Roxyon BaaS for the backend.
+
+## Read first
+
+- [Complete LumenJS V1 reference](https://lumenjs.com/llms/lumenjs.md): the whole framework, contrasted with Vue/React. Read before writing any `.view` file.
+- [Roxyon BaaS reference](https://roxyon.com/llms/baas.md): the data/auth backend LumenJS apps use.
+
+## The rules that bite (V1)
+
+- State is `var` (never `let`/`const`) in a `<script>` inside the view; it becomes reactive only when named in `bind="name"` on an ancestor element.
+- A `bind` inside another `bind` silently stops the inner subtree from rendering. One bind per independent region; use siblings, never nesting.
+- `bind` renders its descendants, not its own attributes — put it on the parent of whatever interpolates.
+- `:for` does not resolve the loop variable in nested loops, or in an element's own non-backtick attributes. Build nested / attribute-heavy markup as an HTML string in JS and inject it.
+- A function call in a `{{ }}` moustache is evaluated once and then goes stale — compute into a plain `var` and re-render on change.
+- Forms are handled wholesale via `o-sub` / `b-sub` on the `<form>`; there is no `v-model` equivalent.
+
+## Tooling
+
+- [@lmjs/cli](https://www.npmjs.com/package/@lmjs/cli): `lm create <name>`, `lm serve`, `lm build --serverless`. `npm i -g @lmjs/cli`.
+- Deploy: `roxyon init` then `roxyon deploy` (static) — see the Roxyon docs.

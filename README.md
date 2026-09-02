@@ -10,7 +10,8 @@ from anywhere.
 | [`@roxyon/deploy-core`](packages/deploy-core) | Shared deploy pipeline — project detection, archiving, build/upload/poll orchestration | **M1** |
 | [`@roxyon/cli`](packages/cli) | `roxyon` — `login`, `init`, `deploy`, `logs`, `env`, `restart`, `open`, `link` | **M1** |
 | [`@roxyon/mcp`](packages/mcp-server) | MCP server (stdio) so Claude Code / Cursor / Gemini CLI / … can drive all of the above | **M2** — stdio done; HTTP+OAuth pending |
-| `backend/` | Reference implementation of the two new console endpoints the CLI needs | **M1** — spec + drafts |
+| [`backend/`](backend) | The two new console endpoints + node script (`/applications/deploy`, `/sites/deploy`, `app-source-apply.sh`) | written & wired in `_configs`, not synced |
+| [`docs/`](docs) | `llms.txt`, BaaS OpenAPI 3.1, `AGENTS.md` template, distribution checklist | **M3** — drafted |
 | `create-roxyon-app` | Scaffolder that emits `AGENTS.md` + `roxyon.json` + `llms.txt` | M4 (planned) |
 
 See [`docs/roadmap.md`](docs/roadmap.md) for the full plan.
