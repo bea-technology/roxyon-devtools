@@ -54,8 +54,8 @@ if [ ! -s "$TARBALL" ]; then
     echo "No archive on stdin" >&2; exit 2
 fi
 
-# gzip magic
-if [ "$(head -c2 "$TARBALL" | xxd -p)" != "1f8b" ]; then
+# gzip magic (od is coreutils — always present; xxd is not)
+if [ "$(head -c2 "$TARBALL" | od -An -tx1 | tr -d ' \n')" != "1f8b" ]; then
     echo "stdin is not a gzip archive" >&2; exit 2
 fi
 
