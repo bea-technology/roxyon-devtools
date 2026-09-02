@@ -6,6 +6,7 @@
  * only a PAT never has to touch the BaaS).
  *
  *   GET /account/context   ->  { user, subscriptions[], domains[] }
+ *   GET /account/apps       ->  { applications[] }   (list, PAT-safe)
  *
  * Auth: X-BEA-Session-Token, or `Authorization: Bearer roxp_…` (any scope).
  */
@@ -28,6 +29,11 @@ class AccountContext
         }
         if (isset($who['denied'])) {
             $this->fail($res, 403, 'This access token does not have the "' . $who['denied'] . '" scope');
+            return;
+        }
+
+        if (strtolower((string) ($nodes[1] ?? '')) === 'apps') {
+            $this->apps($res, $who);
             return;
         }
 
@@ -75,6 +81,37 @@ class AccountContext
                 'name'         => (string) ($d->Name ?? ''),
                 'subscription' => (string) ($d->Subscription ?? ''),
             ], $domains),
+        ]);
+    }
+
+    private function apps($res, array $who): void
+    {
+        $rows = [];
+        if ($who['subs']) {
+            $rows = $this->many('/Applications', [
+                'fields' => 'objectId,Name,Status,DesiredState,Runtime,RuntimeVersion,'
+                          . 'ConfigRevision,AppliedRevision,LastError,SourcePath,RepoUrl,RepoBranch,Subscription',
+                'limit'  => -1,
+                'order'  => 'Name',
+                'where'  => ['Subscription' => ['in' => implode(',', $who['subs'])]],
+            ]);
+        }
+        $this->ok($res, [
+            'applications' => array_map(fn($a) => [
+                'id'              => (string) ($a->objectId ?? ''),
+                'name'            => (string) ($a->Name ?? ''),
+                'status'          => (string) ($a->Status ?? ''),
+                'desiredState'    => (string) ($a->DesiredState ?? ''),
+                'runtime'         => trim(((string) ($a->Runtime ?? '')) . ' ' . ((string) ($a->RuntimeVersion ?? ''))),
+                'configRevision'  => (int) ($a->ConfigRevision ?? 0),
+                'appliedRevision' => (int) ($a->AppliedRevision ?? 0),
+                'lastError'       => (string) ($a->LastError ?? '') ?: null,
+                'sourcePath'      => (string) ($a->SourcePath ?? ''),
+                'repo'            => ($a->RepoUrl ?? '') ? [
+                    'url'    => (string) $a->RepoUrl,
+                    'branch' => (string) ($a->RepoBranch ?? 'main'),
+                ] : null,
+            ], $rows),
         ]);
     }
 

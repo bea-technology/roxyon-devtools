@@ -102,30 +102,18 @@ export function registerTools(server: McpServer): void {
     () =>
       guard(async () => {
         const session = await getSession();
-        const ctx = await accountContext(session);
-        const sub = ctx.subscriptions[0];
-        if (!sub) return text('(no subscription on this account)', { applications: [] });
-        const apps = await session.roxyon.applications.list(sub.id);
+        const apps = await session.roxyon.account.apps();
         const body = apps.length
           ? apps
               .map(
                 (a) =>
-                  `- ${a.Name} [${a.objectId}] — ${a.Status ?? '?'} ` +
-                  `(rev ${a.AppliedRevision ?? 0}/${a.ConfigRevision ?? 0})` +
-                  `${a.RepoUrl ? ` · git:${a.RepoBranch ?? 'main'}` : ''}`,
+                  `- ${a.name} [${a.id}] — ${a.status || '?'} ` +
+                  `(rev ${a.appliedRevision}/${a.configRevision})` +
+                  `${a.repo ? ` · git:${a.repo.branch}` : ''}`,
               )
               .join('\n')
           : '(no applications)';
-        return text(body, {
-          applications: apps.map((a) => ({
-            id: a.objectId,
-            name: a.Name,
-            status: a.Status,
-            configRevision: a.ConfigRevision,
-            appliedRevision: a.AppliedRevision,
-            lastError: a.LastError || undefined,
-          })),
-        });
+        return text(body, { applications: apps });
       }),
   );
 
@@ -300,25 +288,25 @@ export function registerTools(server: McpServer): void {
       guard(async () => {
         const session = await getSession();
         const { applicationId } = await resolveApp(args);
-        const app = await session.roxyon.applications.get(applicationId);
+        const app = await session.roxyon.account.getApp(applicationId);
         if (!app) return errorResult(`Application ${applicationId} not found.`);
-        const settled = Number(app.ConfigRevision ?? 0) <= Number(app.AppliedRevision ?? 0);
+        const settled = app.configRevision <= app.appliedRevision;
         const body = [
-          `${app.Name} [${app.objectId}]`,
-          `Status:   ${app.Status ?? '?'}${settled ? '' : ' (applying)'}`,
-          `Revision: ${app.AppliedRevision ?? 0} / ${app.ConfigRevision ?? 0}`,
-          `Runtime:  ${app.Runtime} ${app.RuntimeVersion ?? ''}`.trim(),
-          app.LastError ? `\nLast error:\n${app.LastError}` : '',
+          `${app.name} [${app.id}]`,
+          `Status:   ${app.status || '?'}${settled ? '' : ' (applying)'}`,
+          `Revision: ${app.appliedRevision} / ${app.configRevision}`,
+          `Runtime:  ${app.runtime}`.trim(),
+          app.lastError ? `\nLast error:\n${app.lastError}` : '',
         ]
           .filter(Boolean)
           .join('\n');
         return text(body, {
-          id: app.objectId,
-          status: app.Status,
+          id: app.id,
+          status: app.status,
           settled,
-          configRevision: app.ConfigRevision,
-          appliedRevision: app.AppliedRevision,
-          lastError: app.LastError || undefined,
+          configRevision: app.configRevision,
+          appliedRevision: app.appliedRevision,
+          lastError: app.lastError || undefined,
         });
       }),
   );
@@ -385,9 +373,7 @@ export function registerTools(server: McpServer): void {
       guard(async () => {
         const session = await getSession();
         const { applicationId } = await resolveApp(args);
-        const app = await session.roxyon.applications.get(applicationId);
-        if (!app) return errorResult(`Application ${applicationId} not found.`);
-        const env = envFromStored(app.Env);
+        const env = await session.roxyon.applications.getEnv(applicationId);
         return text(formatEnv(env) || '(none set)', { env });
       }),
   );
@@ -412,32 +398,26 @@ export function registerTools(server: McpServer): void {
       guard(async () => {
         const session = await getSession();
         const { applicationId } = await resolveApp(args);
-        const app = await session.roxyon.applications.get(applicationId);
-        if (!app) return errorResult(`Application ${applicationId} not found.`);
-        const env = envFromStored(app.Env);
-        const changed: string[] = [];
+        const set: Record<string, string> = {};
         for (const [k, v] of Object.entries(args.vars)) {
           if (k === 'PORT' || k === 'HOST') continue;
           if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) return errorResult(`Invalid env key "${k}".`);
-          env[k] = v;
-          changed.push(k);
+          set[k] = v;
         }
-        for (const k of args.remove ?? []) {
-          if (k in env) {
-            delete env[k];
-            changed.push(`-${k}`);
-          }
-        }
+        const planned = [...Object.keys(set), ...(args.remove ?? []).map((k) => `-${k}`)];
         if (!args.confirm) {
-          return text(`Would update: ${changed.join(', ') || '(nothing)'}. Pass confirm:true.`, {
+          return text(`Would update: ${planned.join(', ') || '(nothing)'}. Pass confirm:true.`, {
             dryRun: true,
-            changed,
+            changed: planned,
           });
         }
-        await session.roxyon.applications.setEnv(app, env);
-        return text(`Updated ${changed.join(', ')}. Run roxyon_deploy to apply.`, {
+        const r = await session.roxyon.applications.setEnv(applicationId, {
+          set,
+          remove: args.remove ?? [],
+        });
+        return text(`Updated ${r.changed.join(', ') || '(nothing)'}. Run roxyon_deploy to apply.`, {
           ok: true,
-          changed,
+          changed: r.changed,
         });
       }),
   );

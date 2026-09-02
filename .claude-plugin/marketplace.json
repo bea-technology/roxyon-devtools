@@ -1,0 +1,11 @@
+{
+  "name": "roxyon",
+  "owner": { "name": "BEA Technology", "url": "https://roxyon.com" },
+  "plugins": [
+    {
+      "name": "roxyon",
+      "source": "./integrations/claude-code-plugin",
+      "description": "Build LumenJS apps, use the Roxyon BaaS, and deploy to Roxyon infrastructure from Claude Code."
+    }
+  ]
+}

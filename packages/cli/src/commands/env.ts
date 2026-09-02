@@ -1,4 +1,4 @@
-import { RoxyonApiError, envFromStored, formatEnv } from '@roxyon/api-client';
+import { RoxyonApiError, formatEnv } from '@roxyon/api-client';
 import { loadProjectConfig } from '../config.js';
 import { requireSession } from '../context.js';
 import { EXIT, fail, ui } from '../ui.js';
@@ -13,22 +13,21 @@ async function resolveApp(explicit?: string): Promise<string> {
 export async function envPull(opts: { app?: string }): Promise<void> {
   const appId = await resolveApp(opts.app);
   const { roxyon } = await requireSession();
-  const app = await roxyon.applications.get(appId);
-  if (!app) fail(`Application ${appId} not found.`, EXIT.configError);
-  const env = envFromStored(app.Env);
-  const text = formatEnv(env);
-  ui.line(text || '# (no environment variables set)');
+  try {
+    const env = await roxyon.applications.getEnv(appId);
+    ui.line(formatEnv(env) || '# (no environment variables set)');
+  } catch (err) {
+    if (err instanceof RoxyonApiError) fail(err.message);
+    throw err;
+  }
 }
 
 export async function envSet(pairs: string[], opts: { app?: string }): Promise<void> {
   if (pairs.length === 0)
     fail('Nothing to set. Usage: roxyon env set KEY=value [KEY2=value2]', EXIT.configError);
   const appId = await resolveApp(opts.app);
-  const { roxyon } = await requireSession();
-  const app = await roxyon.applications.get(appId);
-  if (!app) fail(`Application ${appId} not found.`, EXIT.configError);
 
-  const env = envFromStored(app.Env);
+  const set: Record<string, string> = {};
   for (const pair of pairs) {
     const eq = pair.indexOf('=');
     if (eq < 1) fail(`"${pair}" is not KEY=value.`, EXIT.configError);
@@ -38,11 +37,17 @@ export async function envSet(pairs: string[], opts: { app?: string }): Promise<v
       ui.warn(`${key} is set by the platform — ignoring.`);
       continue;
     }
-    env[key] = pair.slice(eq + 1);
+    set[key] = pair.slice(eq + 1);
   }
 
-  await write(roxyon, app, env);
-  ui.success(`Updated ${pairs.length} variable(s). Run \`roxyon deploy\` to apply.`);
+  const { roxyon } = await requireSession();
+  try {
+    const r = await roxyon.applications.setEnv(appId, { set });
+    ui.success(`Updated ${r.changed.join(', ') || 'nothing'}. Run \`roxyon deploy\` to apply.`);
+  } catch (err) {
+    if (err instanceof RoxyonApiError) fail(err.message);
+    throw err;
+  }
 }
 
 export async function envRm(keys: string[], opts: { app?: string }): Promise<void> {
@@ -50,28 +55,9 @@ export async function envRm(keys: string[], opts: { app?: string }): Promise<voi
     fail('Nothing to remove. Usage: roxyon env rm KEY [KEY2]', EXIT.configError);
   const appId = await resolveApp(opts.app);
   const { roxyon } = await requireSession();
-  const app = await roxyon.applications.get(appId);
-  if (!app) fail(`Application ${appId} not found.`, EXIT.configError);
-
-  const env = envFromStored(app.Env);
-  let removed = 0;
-  for (const k of keys) {
-    if (k in env) {
-      delete env[k];
-      removed++;
-    }
-  }
-  await write(roxyon, app, env);
-  ui.success(`Removed ${removed} variable(s). Run \`roxyon deploy\` to apply.`);
-}
-
-async function write(
-  roxyon: Awaited<ReturnType<typeof requireSession>>['roxyon'],
-  app: { objectId: string; ConfigRevision?: number },
-  env: Record<string, string>,
-): Promise<void> {
   try {
-    await roxyon.applications.setEnv(app, env);
+    const r = await roxyon.applications.setEnv(appId, { remove: keys });
+    ui.success(`Removed ${r.changed.join(', ') || 'nothing'}. Run \`roxyon deploy\` to apply.`);
   } catch (err) {
     if (err instanceof RoxyonApiError) fail(err.message);
     throw err;

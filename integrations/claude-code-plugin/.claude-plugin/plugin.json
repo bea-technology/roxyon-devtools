@@ -1,0 +1,9 @@
+{
+  "name": "roxyon",
+  "description": "Build LumenJS apps, use the Roxyon BaaS, and deploy to Roxyon infrastructure — from Claude Code.",
+  "version": "0.1.0",
+  "author": { "name": "BEA Technology", "url": "https://roxyon.com" },
+  "homepage": "https://roxyon.com",
+  "repository": "https://github.com/bea-technology/roxyon-devtools",
+  "keywords": ["roxyon", "lumenjs", "deploy", "baas", "mcp"]
+}

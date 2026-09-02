@@ -456,6 +456,98 @@ paths:
       responses:
         "200": { description: revoked }
 
+  /account/apps:
+    servers:
+      - url: https://console.roxyon.com
+    get:
+      operationId: accountApps
+      summary: The account's applications (list, PAT-safe)
+      security: [{ SessionToken: [] }, { Pat: [] }]
+      responses:
+        "200":
+          description: applications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  applications:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        status: { type: string }
+                        desiredState: { type: string }
+                        runtime: { type: string }
+                        configRevision: { type: integer }
+                        appliedRevision: { type: integer }
+                        lastError: { type: [string, "null"] }
+                        sourcePath: { type: string }
+                        repo:
+                          type: [object, "null"]
+                          properties:
+                            url: { type: string }
+                            branch: { type: string }
+
+  /applications/env:
+    servers:
+      - url: https://console.roxyon.com
+    get:
+      operationId: getApplicationEnv
+      summary: Read an application's environment variables
+      security: [{ SessionToken: [] }, { Pat: [] }]
+      parameters:
+        - name: application
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: env
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  env: { type: object, additionalProperties: { type: string } }
+    post:
+      operationId: setApplicationEnv
+      summary: Merge / delete environment variables and bump the revision
+      description: >
+        `set` merges, `remove` deletes. `PORT` and `HOST` are ignored. Bumps
+        `ConfigRevision` — the next deploy applies the change.
+      security: [{ SessionToken: [] }, { Pat: [] }]
+      parameters:
+        - name: application
+          in: query
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                set: { type: object, additionalProperties: { type: string } }
+                remove: { type: array, items: { type: string } }
+      responses:
+        "200":
+          description: updated env
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  env: { type: object, additionalProperties: { type: string } }
+                  changed: { type: array, items: { type: string } }
+                  configRevision: { type: integer }
+
   /account/context:
     servers:
       - url: https://console.roxyon.com

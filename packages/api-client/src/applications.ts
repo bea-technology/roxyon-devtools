@@ -158,21 +158,46 @@ export class ApplicationsApi {
     return { application: appId, process: procId, route: routeId };
   }
 
-  /** Merge `Env` (JSON object) and bump `ConfigRevision` so the next deploy applies it. */
-  async setEnv(
-    app: Pick<Application, 'objectId' | 'ConfigRevision'>,
-    env: Record<string, string>,
-  ): Promise<void> {
-    assertOk(
-      await this.client.put('/Applications', {
-        objectId: app.objectId,
-        Env: JSON.stringify(env),
-        ConfigRevision: Number(app.ConfigRevision ?? 0) + 1,
-      }),
-    );
+  // ---- console endpoints (session token or PAT) ----
+
+  /** Read an application's environment. `GET /applications/env`. */
+  async getEnv(applicationId: string): Promise<Record<string, string>> {
+    const r = await this.client.console<{
+      ok?: boolean;
+      env?: Record<string, string>;
+      error?: string;
+    }>('GET', '/applications/env', {
+      query: { application: applicationId },
+      tolerateHttpError: true,
+    });
+    if (!r?.ok)
+      throw new RoxyonApiError(r?.error || 'Could not read the environment.', { body: r });
+    return r.env ?? {};
   }
 
-  // ---- console endpoints (session-authed) ----
+  /**
+   * Merge `set` and delete `remove`, bumping `ConfigRevision`. `PORT`/`HOST` are
+   * ignored (platform-managed). `POST /applications/env`. Returns the new env.
+   */
+  async setEnv(
+    applicationId: string,
+    changes: { set?: Record<string, string>; remove?: string[] },
+  ): Promise<{ env: Record<string, string>; changed: string[]; configRevision: number }> {
+    const r = await this.client.console<{
+      ok?: boolean;
+      env?: Record<string, string>;
+      changed?: string[];
+      configRevision?: number;
+      error?: string;
+    }>('POST', '/applications/env', {
+      query: { application: applicationId },
+      body: { set: changes.set ?? {}, remove: changes.remove ?? [] },
+      tolerateHttpError: true,
+    });
+    if (!r?.ok)
+      throw new RoxyonApiError(r?.error || 'Could not update the environment.', { body: r });
+    return { env: r.env ?? {}, changed: r.changed ?? [], configRevision: r.configRevision ?? 0 };
+  }
 
   /** Rebuild from the latest source and restart. `POST /applications/action`. */
   async deploy(applicationId: string): Promise<void> {

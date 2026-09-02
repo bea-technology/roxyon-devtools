@@ -1,7 +1,7 @@
 import { access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
-  type Application,
+  type AccountApp,
   RUNTIMES,
   type Roxyon,
   RoxyonApiError,
@@ -228,9 +228,9 @@ async function watch(
   while (true) {
     await sleep(opts.pollMs);
 
-    let app: Application | undefined;
+    let app: AccountApp | undefined;
     try {
-      app = await roxyon.applications.get(appId);
+      app = await roxyon.account.getApp(appId);
     } catch {
       /* transient */
     }
@@ -239,9 +239,9 @@ async function watch(
       continue;
     }
 
-    const cfg = Number(app.ConfigRevision ?? 0);
-    const applied = Number(app.AppliedRevision ?? 0);
-    const status = String(app.Status ?? '');
+    const cfg = app.configRevision;
+    const applied = app.appliedRevision;
+    const status = app.status;
     if (status !== lastStatus) {
       opts.reporter?.step?.(`${status || 'pending'} (${applied}/${cfg})`);
       lastStatus = status;
@@ -278,7 +278,7 @@ async function watch(
         ok: false,
         application: appId,
         status: 'failed',
-        error: (app.LastError || 'Deploy failed.').trim(),
+        error: (app.lastError || 'Deploy failed.').trim(),
         config: opts.config,
         logs: collected,
       };

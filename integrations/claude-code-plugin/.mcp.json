@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "roxyon": {
+      "command": "npx",
+      "args": ["-y", "@roxyon/mcp"],
+      "env": {}
+    }
+  }
+}

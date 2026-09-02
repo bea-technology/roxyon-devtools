@@ -8,9 +8,10 @@ the deployed versions live in the Roxyon `_configs` tree:
 |---|---|
 | `ApplicationDeploy.php` | `_configs/app-x/console/clone/libs/ApplicationDeploy.php` |
 | `SiteDeploy.php` | `_configs/app-x/console/clone/libs/SiteDeploy.php` |
-| `AccountTokens.php` | `_configs/app-x/console/clone/libs/AccountTokens.php` — PAT management |
-| `AccountContext.php` | `_configs/app-x/console/clone/libs/AccountContext.php` — one PAT-safe context call |
-| `migrate-pat.php` | `_configs/app-x/console/clone/exec/migrate-pat.php` — run once on a node |
+| `AccountTokens.php` | `…/libs/AccountTokens.php` — PAT management (`/account/tokens`) |
+| `AccountContext.php` | `…/libs/AccountContext.php` — `GET /account/context` + `GET /account/apps` (PAT-safe) |
+| `ApplicationEnv.php` | `…/libs/ApplicationEnv.php` — `GET/POST /applications/env` (PAT-safe env, bumps ConfigRevision) |
+| `migrate-pat.php` | `…/exec/migrate-pat.php` — run once on a node |
 | `app-source-apply.sh` | `_configs/x-x/scripts/clone/app-source-apply.sh` → `/usr/local/bin/` on every app node |
 
 Plus in `core/server.php`: `patIdentify()` + `apiCaller()` helpers (accept
@@ -63,7 +64,7 @@ Status: **written and wired in `_configs/…/clone/`, not yet synced to the node
 ```
 CL=_configs/app-x/console/clone
 # console PHP (new + modified):
-scp $CL/libs/{ApplicationDeploy,SiteDeploy,AccountTokens,AccountContext,ApplicationAction,ApplicationLogs,server_setup}.php  lb-1:/home/_configs/app-x/console/clone/libs/
+scp $CL/libs/{ApplicationDeploy,ApplicationEnv,SiteDeploy,AccountTokens,AccountContext,ApplicationAction,ApplicationLogs,server_setup}.php  lb-1:/home/_configs/app-x/console/clone/libs/
 scp $CL/core/server.php   lb-1:/home/_configs/app-x/console/clone/core/
 scp $CL/exec/{worker,migrate-pat}.php  lb-1:/home/_configs/app-x/console/clone/exec/
 scp _configs/app-x/console/sync.sh   lb-1:/home/_configs/app-x/console/    # trigger

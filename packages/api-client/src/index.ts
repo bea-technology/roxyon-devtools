@@ -28,6 +28,7 @@ export { SubscriptionsApi } from './subscriptions.js';
 export type { Subscription, Privilege } from './subscriptions.js';
 export { AccountApi } from './account.js';
 export type {
+  AccountApp,
   AccountContext,
   AccountSubscription,
   AccountDomain,

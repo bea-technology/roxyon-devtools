@@ -24,6 +24,19 @@ export interface AccountContext {
   domains: AccountDomain[];
 }
 
+export interface AccountApp {
+  id: string;
+  name: string;
+  status: string;
+  desiredState: string;
+  runtime: string;
+  configRevision: number;
+  appliedRevision: number;
+  lastError: string | null;
+  sourcePath: string;
+  repo: { url: string; branch: string } | null;
+}
+
 /**
  * `GET /account/context` — one call the CLI / MCP server use to plan a deploy:
  * the signed-in user, their subscriptions (with node), and their domains.
@@ -55,6 +68,22 @@ export class AccountApi {
       subscriptions: r.subscriptions ?? [],
       domains: r.domains ?? [],
     };
+  }
+
+  /** `GET /account/apps` — the account's applications (list, PAT-safe). */
+  async apps(): Promise<AccountApp[]> {
+    const r = await this.client.console<{
+      ok?: boolean;
+      applications?: AccountApp[];
+      error?: string;
+    }>('GET', '/account/apps', { tolerateHttpError: true });
+    if (!r?.ok) throw new RoxyonApiError(r?.error || 'Could not list applications.', { body: r });
+    return r.applications ?? [];
+  }
+
+  /** One application by id, PAT-safe (filters {@link apps}). */
+  async getApp(id: string): Promise<AccountApp | undefined> {
+    return (await this.apps()).find((a) => a.id === id);
   }
 
   /** Pick the subscription to deploy against — the preferred one, else the only/first. */

@@ -1,0 +1,64 @@
+openapi: 3.1.0
+info:
+  title: Roxyon (ChatGPT actions)
+  version: "1.0.0"
+  description: >
+    A subset of the Roxyon API for a ChatGPT Custom GPT: BaaS data operations,
+    application status/logs, and the account context. Binary source uploads
+    (`roxyon deploy`) are not exposed here — those need the `@roxyon/cli` or the
+    MCP server. Auth is a Personal Access Token: create one with
+    `roxyon token create` and paste it as the API key (Bearer).
+servers:
+  - url: https://console.roxyon.com
+components:
+  securitySchemes:
+    Pat:
+      type: http
+      scheme: bearer
+security:
+  - Pat: []
+paths:
+  /account/context:
+    get:
+      operationId: accountContext
+      summary: The signed-in user, their subscriptions, and their domains
+      responses:
+        "200": { description: context }
+  /account/tokens:
+    get:
+      operationId: listTokens
+      summary: List the caller's personal access tokens
+      responses:
+        "200": { description: tokens }
+  /applications/logs:
+    post:
+      operationId: applicationLogs
+      summary: Recent journal lines for an application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [application]
+              properties:
+                application: { type: string }
+                lines: { type: integer, default: 100 }
+      responses:
+        "200": { description: log blocks per process }
+  /applications/action:
+    post:
+      operationId: applicationAction
+      summary: Rebuild-from-source ("deploy") or bounce ("restart") an application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [application, action]
+              properties:
+                application: { type: string }
+                action: { type: string, enum: [deploy, restart] }
+      responses:
+        "200": { description: queued }
