@@ -1,0 +1,32 @@
+{
+  "name": "create-roxyon-app",
+  "version": "0.1.0",
+  "description": "Scaffold a Roxyon project — LumenJS SPA or a Node app — wired for `roxyon deploy`, with AGENTS.md / llms.txt / editor rules so any AI assistant gets it right.",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "create-roxyon-app": "./bin/create-roxyon-app.js" },
+  "files": ["dist", "bin", "templates"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": { "node": ">=20" },
+  "keywords": ["roxyon", "lumenjs", "scaffold", "create", "starter"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bea-technology/roxyon-devtools.git",
+    "directory": "packages/create-roxyon-app"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "@roxyon/deploy-core": "workspace:*",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.3"
+  }
+}

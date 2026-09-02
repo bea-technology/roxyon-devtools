@@ -12,19 +12,22 @@ from anywhere.
 | [`@roxyon/mcp`](packages/mcp-server) | MCP server (stdio) so Claude Code / Cursor / Gemini CLI / … can drive all of the above | **M2** — stdio done; HTTP+OAuth pending |
 | [`backend/`](backend) | The two new console endpoints + node script (`/applications/deploy`, `/sites/deploy`, `app-source-apply.sh`) | written & wired in `_configs`, not synced |
 | [`docs/`](docs) | `llms.txt`, BaaS OpenAPI 3.1, `AGENTS.md` template, distribution checklist | **M3** — drafted |
-| `create-roxyon-app` | Scaffolder that emits `AGENTS.md` + `roxyon.json` + `llms.txt` | M4 (planned) |
+| [`create-roxyon-app`](packages/create-roxyon-app) | `npm create roxyon-app` — LumenJS / Node templates, emits `AGENTS.md` + `roxyon.json` + `llms.txt` + editor rules | **M4** |
+| [`integrations/`](integrations) | Per-assistant wrappers — Claude Code plugin, ChatGPT GPT, Cursor/etc. install snippets | **M5** |
 
 See [`docs/roadmap.md`](docs/roadmap.md) for the full plan.
 
 ## Quick start
 
 ```bash
-npm i -g @roxyon/cli
-roxyon login
-cd my-lumen-app
-roxyon init          # writes roxyon.json
-roxyon deploy        # builds + uploads + waits for it to go live
+npm create roxyon-app@latest my-app     # LumenJS or Node, wired for deploy
+cd my-app
+npm i -g @roxyon/cli && roxyon login
+roxyon deploy                            # builds + uploads + waits for it to go live
 ```
+
+Existing project instead of a new one: `roxyon init` writes `roxyon.json`, then
+`roxyon deploy`.
 
 CI (no interactive login) — create a token once, then use it as `ROXYON_TOKEN`:
 
