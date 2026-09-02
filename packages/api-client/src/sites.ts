@@ -20,19 +20,11 @@ export interface StaticDeployResult {
 export class SitesApi {
   constructor(private readonly client: RoxyonClient) {}
 
-  async deploy(
-    host: string,
-    folder: string,
-    tarball: Uint8Array,
-    opts: { clean?: boolean } = {},
-  ): Promise<StaticDeployResult> {
-    const form = new FormData();
-    form.set('host', host);
-    form.set('folder', folder);
-    if (opts.clean) form.set('clean', '1');
-    form.set('archive', new Blob([tarball], { type: 'application/gzip' }), 'site.tar.gz');
+  async deploy(host: string, folder: string, tarball: Uint8Array): Promise<StaticDeployResult> {
     const r = await this.client.console<StaticDeployResult>('POST', '/sites/deploy', {
-      body: form,
+      query: { host, folder },
+      headers: { 'content-type': 'application/gzip' },
+      body: tarball,
       tolerateHttpError: true,
     });
     if (!r?.ok) throw new RoxyonApiError(r?.error || 'Static deploy failed.', { body: r });

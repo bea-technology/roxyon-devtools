@@ -1,148 +1,239 @@
 <?php
-/**
- * libs/ApplicationDeploy.php  —  POST /applications/deploy
- *
- * Reference implementation. Adapt the helper names (wsIdentify, node(), sh(),
- * incusExec, baas(), …) to the console's actual `libs/` conventions — see
- * libs/ApplicationAction.php and libs/ApplicationRepo.php for the real ones.
- *
- * Contract: backend/applications-deploy.md
- */
 
+/**
+ * ApplicationDeploy — console side, takes a source tarball from the CLI / MCP
+ * server and lands it in the application's SourcePath, then bumps ConfigRevision
+ * so the reconciler builds and releases it exactly as it does for a git push.
+ *
+ * Route:  POST /applications/deploy?application=<id>
+ * Body:   raw gzip tarball (Content-Type: application/gzip). The archive is the
+ *         project tree the customer wants deployed, already minus node_modules /
+ *         .git / build caches (the client strips those).
+ * Auth:   X-BEA-Session-Token; the caller must hold a privilege on the
+ *         application's subscription.
+ *
+ * WHY A TARBALL AND NOT SFTP
+ * -------------------------
+ * SFTP would mean handing every developer (and every CI job) the container's
+ * shell credentials. This endpoint is scoped to one application the caller
+ * already owns, the upload only ever lands inside that application's SourcePath,
+ * and the build still happens in an isolated release dir — same as today.
+ *
+ * WHY NOT EXTRACT ON THE CONSOLE
+ * -----------------------------
+ * The container lives on exactly one app node and the console is load-balanced
+ * across all of them. app-source-apply.sh runs where the container is (over ssh
+ * when that is elsewhere) — the same hop ApplicationLogs uses.
+ *
+ * WHY REPO-CONNECTED APPS ARE REJECTED
+ * -----------------------------------
+ * A git-connected app's source of truth is the branch. Letting a tarball
+ * overwrite it would silently diverge the running release from the repo. Those
+ * apps deploy by pushing.
+ */
 class ApplicationDeploy
 {
-    const MAX_BYTES   = 512 * 1024 * 1024;
-    const MAX_ENTRIES = 20000;
+    private const APPID_RE   = '/^[A-Za-z0-9]{1,40}$/';
+    private const MAX_BYTES  = 64 * 1024 * 1024;
+    private const GZIP_MAGIC = "\x1f\x8b";
 
-    /** @param array $req  Swoole request (headers, files, post) */
-    public static function handle($req): array
-    {
-        // 1. auth ------------------------------------------------------------
-        $user = wsIdentify($req);                       // TODO console helper
-        if (!$user) {
-            return ['ok' => false, 'error' => 'Not signed in.'];
-        }
-
-        $appId   = trim($req->post['application'] ?? '');
-        $tmpFile = $req->files['archive']['tmp_name'] ?? '';
-        if ($appId === '' || $tmpFile === '' || !is_file($tmpFile)) {
-            return ['ok' => false, 'error' => 'application and archive are required.'];
-        }
-
-        // 2. load + ownership ---------------------------------------------------
-        $app = baas()->get('/Applications', [
-            'where'  => ['objectId' => $appId],
-            'fields' => 'objectId,Name,SourcePath,Subscription,RepoUrl,ConfigRevision',
-            'limit'  => 1,
-        ])['results'][0] ?? null;
-        if (!$app) {
-            return ['ok' => false, 'error' => 'Application not found.'];
-        }
-        if (!userOwnsSubscription($user, $app['Subscription'])) {   // TODO helper
-            return ['ok' => false, 'error' => 'You do not have access to this application.'];
-        }
-        if (!empty($app['RepoUrl'])) {
-            return ['ok' => false, 'error' =>
-                'This application deploys from its git remote — push to redeploy, '
-                . 'or disconnect the repo first.'];
-        }
-
-        // 3. validate the archive -------------------------------------------
-        $err = self::validateArchive($tmpFile);
-        if ($err) {
-            return ['ok' => false, 'error' => $err];
-        }
-
-        // 4. resolve the node + container ---------------------------------------
-        $sub = baas()->get('/Subscriptions', [
-            'where'  => ['objectId' => $app['Subscription']],
-            'fields' => 'objectId,Node,Username',
-            'limit'  => 1,
-        ])['results'][0] ?? null;
-        if (!$sub || empty($sub['Node'])) {
-            return ['ok' => false, 'error' => 'Could not resolve the subscription node.'];
-        }
-        $node      = $sub['Node'];
-        $container = $sub['Username'];
-        $srcPath   = $app['SourcePath'];
-
-        if (strpos($srcPath, '/home/www/') !== 0 || strpos($srcPath, '/public_html') === false) {
-            return ['ok' => false, 'error' => 'Application has an unexpected source path.'];
-        }
-
-        // 5. ship the tarball to the node + into the container, then apply ----
-        $remoteTmp = '/tmp/rxdeploy-' . bin2hex(random_bytes(6)) . '.tar.gz';
-        nodePut($node, $tmpFile, $remoteTmp);                       // scp / rsync to the node
-        nodeSh($node, sprintf(
-            'incus file push %s %s/%s',
-            escapeshellarg($remoteTmp),
-            escapeshellarg($container),
-            ltrim($remoteTmp, '/')
-        ));
-
-        $script = file_get_contents(__DIR__ . '/../scripts/app-source-apply.sh');
-        $out = nodeSh($node, sprintf(
-            'incus exec %s -- su %s -c %s < /dev/null; '
-            . 'printf %s | incus exec %s -- su %s -c %s',
-            escapeshellarg($container), escapeshellarg($container), escapeshellarg('true'),
-            escapeshellarg($script),
-            escapeshellarg($container), escapeshellarg($container),
-            escapeshellarg('bash -s -- ' . escapeshellarg($srcPath) . ' ' . escapeshellarg($remoteTmp))
-        ));
-
-        nodeSh($node, 'rm -f ' . escapeshellarg($remoteTmp));
-        nodeSh($node, sprintf('incus exec %s -- rm -f %s',
-            escapeshellarg($container), escapeshellarg($remoteTmp)));
-
-        if (strpos($out, 'RX_SOURCE_APPLIED=') === false) {
-            return ['ok' => false, 'error' => 'Could not apply the uploaded source: '
-                . self::tail($out)];
-        }
-
-        // 6. bump ConfigRevision -> the reconciler builds it ---------------
-        $next = (int)($app['ConfigRevision'] ?? 0) + 1;
-        $w = baas()->put('/Applications', [
-            'objectId'      => $appId,
-            'ConfigRevision'=> $next,
-        ]);
-        if ($msg = rxError($w)) {                                   // resolve-on-failure!
-            return ['ok' => false, 'error' => 'Uploaded, but could not queue the build: ' . $msg];
-        }
-
-        return ['ok' => true, 'application' => $appId, 'configRevision' => $next];
+    public function __construct(
+        private $server,
+        private array $config,
+    ) {
     }
 
-    private static function validateArchive(string $path): ?string
+    public function handle($req, $res, array $nodes, $data): void
     {
-        if (filesize($path) > self::MAX_BYTES) {
-            return 'Archive is larger than 512 MB.';
+        $res->header('Content-Type', 'application/json');
+
+        if (($req->server['request_method'] ?? 'GET') !== 'POST') {
+            $this->fail($res, 405, 'Method not allowed');
+            return;
         }
-        $fh = fopen($path, 'rb');
-        $magic = fread($fh, 2);
-        fclose($fh);
-        if (bin2hex($magic) !== '1f8b') {
-            return 'Archive is not a gzip tarball.';
+
+        // --- who is calling ----------------------------------------------------
+        $token = (string) ($req->header['x-bea-session-token'] ?? '');
+        $who   = wsIdentify($this->server, $token);
+        if ($who === null) {
+            $this->fail($res, 401, 'Not signed in');
+            return;
         }
-        // Entry scan (uses PharData or a piped `tar -tz`); reject traversal.
-        $list = [];
-        exec('tar -tzf ' . escapeshellarg($path) . ' 2>/dev/null', $list, $rc);
-        if ($rc !== 0) {
-            return 'Archive could not be read.';
+
+        $appId = trim((string) ($req->get['application'] ?? $req->get['applicationId'] ?? ''));
+        if (preg_match(self::APPID_RE, $appId) !== 1) {
+            $this->fail($res, 400, 'An application id is required (?application=<id>)');
+            return;
         }
-        if (count($list) > self::MAX_ENTRIES) {
-            return 'Archive has too many files.';
+
+        // --- the archive -----------------------------------------------------
+        $blob = (string) $req->rawContent();
+        if ($blob === '') {
+            $this->fail($res, 400, 'Empty request body — expected a gzip tarball');
+            return;
         }
-        foreach ($list as $entry) {
-            if ($entry === '' || $entry[0] === '/' ||
-                preg_match('#(^|/)\.\.(/|$)#', $entry)) {
-                return 'Archive contains an unsafe path: ' . $entry;
+        if (strlen($blob) > self::MAX_BYTES) {
+            $this->fail($res, 413, 'Archive too large (limit ' . (self::MAX_BYTES >> 20) . ' MB)');
+            return;
+        }
+        if (substr($blob, 0, 2) !== self::GZIP_MAGIC) {
+            $this->fail($res, 400, 'Body is not a gzip archive');
+            return;
+        }
+
+        // --- the application and its owner -----------------------------------
+        $app = $this->one('/Applications', [
+            'fields' => 'objectId,Name,Subscription,SourcePath,RepoUrl,DesiredState,ConfigRevision',
+            'limit'  => 1,
+            'where'  => ['objectId' => $appId],
+        ]);
+        $subId = (string) ($app->Subscription ?? '');
+
+        // Same answer for "not yours" and "does not exist" — ids cannot be walked.
+        if ($app === null || $subId === '' || !in_array($subId, $who['subs'], true)) {
+            $this->fail($res, 404, 'Application not found');
+            return;
+        }
+
+        if (trim((string) ($app->RepoUrl ?? '')) !== '') {
+            $this->fail($res, 409, 'This application deploys from git — push to the connected branch instead.');
+            return;
+        }
+        if ((string) ($app->DesiredState ?? 'running') !== 'running') {
+            $this->fail($res, 409, 'Start the application first');
+            return;
+        }
+
+        $sourcePath = (string) ($app->SourcePath ?? '');
+        if (strncmp($sourcePath, '/home/www/', 10) !== 0 || str_contains($sourcePath, '..')) {
+            $this->fail($res, 500, 'The application has no valid source path');
+            return;
+        }
+
+        // --- which node holds the container --------------------------------
+        $sub = $this->one('/Subscriptions', [
+            'fields' => 'objectId,Username,Node',
+            'limit'  => 1,
+            'where'  => ['objectId' => $subId],
+        ]);
+        $container = (string) ($sub->Username ?? '');
+        $nodeId    = (string) ($sub->Node ?? '');
+        if ($container === '') {
+            $this->fail($res, 503, 'The application host is unavailable');
+            return;
+        }
+
+        $isLocal = $nodeId !== '' && $nodeId === (string) ($this->config['node']['objectId'] ?? '');
+        $nodeIp  = '';
+        if (!$isLocal) {
+            $node   = $this->one('/Nodes', [
+                'fields' => 'objectId,Name,PrivateIP',
+                'limit'  => 1,
+                'where'  => ['objectId' => $nodeId],
+            ]);
+            $nodeIp = (string) ($node->PrivateIP ?? '');
+            if ($nodeIp === '') {
+                $this->fail($res, 503, 'The application host is unavailable');
+                return;
             }
         }
-        return null;
+
+        // --- hand the archive to the node ---------------------------------
+        $tmp = tempnam(sys_get_temp_dir(), 'rxsrc_');
+        if ($tmp === false || file_put_contents($tmp, $blob) === false) {
+            @unlink($tmp);
+            $this->fail($res, 500, 'Could not stage the upload');
+            return;
+        }
+        @chmod($tmp, 0600);
+
+        $inner = '/usr/local/bin/app-source-apply.sh '
+               . escapeshellarg($container) . ' '
+               . escapeshellarg($container) . ' '
+               . escapeshellarg($sourcePath);
+
+        $cmd = $isLocal
+            ? $inner . ' < ' . escapeshellarg($tmp)
+            : 'ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 root@'
+                . escapeshellarg($nodeIp) . ' ' . escapeshellarg($inner)
+                . ' < ' . escapeshellarg($tmp);
+
+        try {
+            $r    = \Swoole\Coroutine\System::exec('timeout 120 bash -c ' . escapeshellarg($cmd));
+            $out  = trim((string) ($r['output'] ?? ''));
+            $code = (int) ($r['code'] ?? 1);
+        } finally {
+            @unlink($tmp);
+        }
+
+        if ($code !== 0) {
+            error_log('[appdeploy] ' . $appId . ' apply failed (' . $code . '): ' . substr($out, -400));
+            $this->fail($res, 502, 'Could not unpack the upload onto the application host');
+            return;
+        }
+
+        $files = 0;
+        if (preg_match('/^RX_FILES=(\d+)$/m', $out, $m)) {
+            $files = (int) $m[1];
+        }
+
+        // --- bump ConfigRevision -> reconciler builds + releases ----------
+        $rev = (int) ($app->ConfigRevision ?? 0);
+        try {
+            $put = $this->server->rx->put('/Applications/' . $appId, ['ConfigRevision' => $rev + 1]);
+            if ($this->apiError($put) !== '') {
+                throw new \RuntimeException($this->apiError($put));
+            }
+        } catch (\Throwable $e) {
+            error_log('[appdeploy] ' . $appId . ' revision bump: ' . $e->getMessage());
+            $this->fail($res, 502, 'The upload landed but the build could not be queued — press Deploy in the console.');
+            return;
+        }
+
+        $this->ok($res, [
+            'application'    => $appId,
+            'configRevision' => $rev + 1,
+            'files'          => $files,
+            'bytes'          => strlen($blob),
+        ]);
     }
 
-    private static function tail(string $s, int $n = 400): string
+    // ------------------------------------------------------------------ helpers
+
+    private function apiError($r): string
     {
-        return substr(trim($s), -$n);
+        if (is_object($r)) $r = (array) $r;
+        if (!is_array($r)) return '';
+        if (!empty($r['error'])) return (string) $r['error'];
+        foreach (($r['results'] ?? []) as $row) {
+            $row = is_object($row) ? (array) $row : $row;
+            if (is_array($row) && !empty($row['error'])) return (string) $row['error'];
+        }
+        return '';
+    }
+
+    private function one(string $path, array $q): ?object
+    {
+        try {
+            $r    = $this->server->rx->get($path, $q);
+            $rows = is_object($r) ? ($r->results ?? []) : ($r['results'] ?? []);
+            $row  = $rows[0] ?? null;
+            return is_array($row) ? (object) $row : $row;
+        } catch (\Throwable $e) {
+            error_log('[appdeploy] query ' . $path . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    private function fail($res, int $status, string $error): void
+    {
+        $res->status($status);
+        $res->end(json_encode(['error' => $error]));
+    }
+
+    private function ok($res, array $data): void
+    {
+        $res->status(200);
+        $res->end(json_encode(['ok' => true] + $data));
     }
 }

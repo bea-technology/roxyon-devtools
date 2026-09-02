@@ -227,11 +227,10 @@ export class ApplicationsApi {
    * `POST /applications/deploy` — NEW endpoint (see `backend/` in this repo).
    */
   async uploadSource(applicationId: string, tarball: Uint8Array): Promise<DeployResult> {
-    const form = new FormData();
-    form.set('application', applicationId);
-    form.set('archive', new Blob([tarball], { type: 'application/gzip' }), 'source.tar.gz');
     const r = await this.client.console<DeployResult>('POST', '/applications/deploy', {
-      body: form,
+      query: { application: applicationId },
+      headers: { 'content-type': 'application/gzip' },
+      body: tarball,
       tolerateHttpError: true,
     });
     if (!r?.ok) throw new RoxyonApiError(r?.error || 'Upload failed.', { body: r });
