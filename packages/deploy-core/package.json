@@ -1,6 +1,6 @@
 {
   "name": "@roxyon/deploy-core",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Shared deploy pipeline for Roxyon tooling — project detection, archiving, and the build/upload/poll orchestration used by @roxyon/cli and @roxyon/mcp.",
   "license": "MIT",
   "type": "module",

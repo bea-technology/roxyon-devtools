@@ -1,6 +1,6 @@
 {
   "name": "create-roxyon-app",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Scaffold a Roxyon project — LumenJS SPA or a Node app — wired for `roxyon deploy`, with AGENTS.md / llms.txt / editor rules so any AI assistant gets it right.",
   "license": "MIT",
   "type": "module",
