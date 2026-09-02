@@ -77,8 +77,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Build (if configured), archive, upload, and — for app runtimes — poll until
- * the deploy settles. Self-contained: resolves the caller's subscription and
- * the project's host, and writes the new application id back into `roxyon.json`.
+ * the deploy settles. Self-contained: one `/account/context` call validates the
+ * host (works with a session token or a `roxp_` PAT), and the console creates
+ * the application on the first deploy — the new id is written back to
+ * `roxyon.json`.
  */
 export async function deployProject(params: DeployParams): Promise<DeployOutcome> {
   const { cwd, roxyon, reporter } = params;
@@ -89,17 +91,16 @@ export async function deployProject(params: DeployParams): Promise<DeployOutcome
     throw new DeployError('No roxyon.json in this directory — run init first.', 'no-config');
   }
 
-  const user = await roxyon.auth.me().catch((e) => {
+  // One call — works with a session token or a PAT.
+  const ctx = await roxyon.account.context().catch((e) => {
     if (isAuthError(e)) throw new DeployError('Session expired — sign in again.', 'auth');
     throw e;
   });
-  const sub = await roxyon.subscriptions.resolve(user.objectId, params.preferredSubscription);
-  const domains = await roxyon.domains.list(sub.objectId);
-  const domain = domains.find((d) => d.Name === config.host);
+  const domain = ctx.domains.find((d) => d.name === config.host);
   if (!domain) {
     throw new DeployError(
-      `Host "${config.host}" is not on this subscription (have: ${
-        domains.map((d) => d.Name).join(', ') || 'none'
+      `Host "${config.host}" is not on this account (have: ${
+        ctx.domains.map((d) => d.name).join(', ') || 'none'
       }).`,
       'bad-host',
     );
@@ -144,48 +145,39 @@ export async function deployProject(params: DeployParams): Promise<DeployOutcome
   }
 
   // ---- app ----
+  // The console's /applications/deploy creates the app rows on the first deploy
+  // (no `application` id yet) from the host + runtime params — one trusted call,
+  // so a PAT-only CI job needs no BaaS write access.
   const runtime = config.runtime === 'lumen' ? 'node' : config.runtime;
   const spec = RUNTIMES[runtime];
-  let appId = config.application;
+  const target = config.application ?? {
+    host: config.host,
+    folder: config.folder,
+    runtime,
+    runtimeVersion: config.runtimeVersion ?? spec.defaultVersion,
+    preset: config.preset ?? spec.presets[0]?.[0] ?? runtime,
+    command: config.start ?? spec.command,
+    public: config.public ?? true,
+  };
 
-  if (!appId) {
-    reporter?.step?.('Creating the application (first deploy)');
-    const sourcePath = `/home/www/${config.host}/public_html${
-      config.folder ? `/${config.folder}` : ''
-    }`;
-    try {
-      const created = await roxyon.applications.create({
-        subscription: sub.objectId,
-        name: config.name,
-        sourcePath,
-        runtime,
-        runtimeVersion: config.runtimeVersion ?? spec.defaultVersion,
-        preset: config.preset ?? spec.presets[0]?.[0] ?? runtime,
-        command: config.start ?? spec.command,
-        domainId: domain.objectId,
-        public: config.public ?? true,
-      });
-      appId = created.application;
+  reporter?.step?.(
+    config.application ? 'Uploading source' : 'Creating the application & uploading',
+  );
+  let revision = 0;
+  let appId: string;
+  try {
+    const res = await roxyon.applications.uploadSource(target, pack.buffer);
+    revision = res.configRevision ?? 0;
+    appId = res.application;
+    if (res.created && appId && appId !== config.application) {
       config.application = appId;
       await saveProjectConfig(config, cwd);
       reporter?.log?.(`application ${appId} created`);
-    } catch (err) {
-      throw new DeployError(
-        err instanceof RoxyonApiError ? err.message : String(err),
-        'create-failed',
-      );
     }
-  }
-
-  reporter?.step?.('Uploading source');
-  let revision = 0;
-  try {
-    const res = await roxyon.applications.uploadSource(appId, pack.buffer);
-    revision = res.configRevision ?? 0;
   } catch (err) {
     throw new DeployError(
       err instanceof RoxyonApiError ? err.message : String(err),
-      'upload-failed',
+      config.application ? 'upload-failed' : 'create-failed',
     );
   }
 

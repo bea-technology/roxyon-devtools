@@ -102,9 +102,23 @@ export class RoxyonClient {
     return json;
   }
 
-  private async authHeaders(skipAuth: boolean): Promise<Record<string, string>> {
+  /** A Personal Access Token (`roxp_…`) authenticates the console endpoints via
+   * `Authorization: Bearer`; it is not a BaaS session token. */
+  private get isPat(): boolean {
+    return this.sessionToken?.startsWith('roxp_') ?? false;
+  }
+
+  private async authHeaders(
+    skipAuth: boolean,
+    isConsole: boolean,
+  ): Promise<Record<string, string>> {
     const base: Record<string, string> = { [H.appId]: this.appId };
     if (skipAuth) return base;
+    if (this.isPat) {
+      // Console: Bearer. BaaS: nothing useful — PAT clients resolve identity and
+      // subscriptions through the console's /account/context instead.
+      return isConsole ? { ...base, authorization: `Bearer ${this.sessionToken}` } : base;
+    }
     if (this.sessionToken) return { ...base, [H.sessionToken]: this.sessionToken };
     if (this.restKey) return { ...base, [H.restKey]: this.restKey };
     const anon = await this.anonToken();
@@ -131,7 +145,7 @@ export class RoxyonClient {
     const qs = toQueryString(opts.query);
     const url = `${root}${path.startsWith('/') ? path : `/${path}`}${qs ? `?${qs}` : ''}`;
     const headers: Record<string, string> = {
-      ...(await this.authHeaders(opts.skipAuth ?? false)),
+      ...(await this.authHeaders(opts.skipAuth ?? false, root === this.consoleUrl)),
       ...opts.headers,
     };
     const hasBody = method !== 'GET' && method !== 'HEAD' && opts.body !== undefined;

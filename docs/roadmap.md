@@ -14,7 +14,7 @@ dependency.
 |---|---|---|
 | **M1** | `@roxyon/api-client` + `@roxyon/deploy-core` + `@roxyon/cli` (`login/init/deploy/logs/env/…`) | **done** (client + CLI) |
 | **backend** | `POST /applications/deploy` + `POST /sites/deploy` console endpoints + `app-source-apply.sh` | **written & wired in `_configs/…/clone/`** (`backend/`), not yet synced to nodes |
-| **M1.5** | `PersonalAccessTokens` class + `/_account/tokens` cloud functions; `roxyon token`; Bearer auth on the console endpoints | next |
+| **M1.5** | Personal Access Tokens | **done** (written & wired in `_configs`, not synced). `PersonalAccessTokens` class (`exec/migrate-pat.php`), `patIdentify()` + Bearer accepted on all deploy endpoints, `GET/POST/DELETE /account/tokens`, `GET /account/context` (one PAT-safe call for user+subs+domains), `/applications/deploy` creates the app on first deploy, `roxyon token create/list/revoke`, api-client Bearer support. |
 | **M2** | `@roxyon/mcp` — MCP server wrapping `@roxyon/api-client` + `@roxyon/deploy-core`. 11 tools, 3 doc resources, 2 prompts. | **stdio done.** Remaining: Streamable-HTTP transport + OAuth (blocked on M1.5 PATs); more tools (`roxyon_provision_database`); registry listings (Anthropic, Cursor, Smithery, Glama, PulseMCP, mcp.so) |
 | **M3** | Docs/knowledge layer. | **drafted** in `docs/` — `llms/{roxyon,lumenjs}.llms.txt`, `openapi/baas.yaml` (validates), `templates/AGENTS.md`, `DISTRIBUTION.md`. Remaining: host them; publish `lumenjs-spec.md` at `lumenjs.com/llms/lumenjs.md`; shared `runtimes.json` |
 | **M4** | `create-roxyon-app` — templates `lumen-spa`, `lumen-baas`, `node-api`, `next`; emits `AGENTS.md` (from `docs/templates/`), `roxyon.json`, `llms.txt`, `.cursor/rules`, `.github/copilot-instructions.md`. | |

@@ -35,10 +35,13 @@ class SiteDeploy
             return;
         }
 
-        $token = (string) ($req->header['x-bea-session-token'] ?? '');
-        $who   = wsIdentify($this->server, $token);
+        $who = apiCaller($this->server, $req, 'deploy');
         if ($who === null) {
-            $this->fail($res, 401, 'Not signed in');
+            $this->fail($res, 401, 'Not signed in (session token or a Bearer PAT is required)');
+            return;
+        }
+        if (isset($who['denied'])) {
+            $this->fail($res, 403, 'This access token does not have the "' . $who['denied'] . '" scope');
             return;
         }
 

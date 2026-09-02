@@ -63,6 +63,13 @@ components:
       type: apiKey
       in: header
       name: X-BEA-Authorization
+    Pat:
+      type: http
+      scheme: bearer
+      description: >
+        A Personal Access Token ("roxp_…") created with `POST /account/tokens`.
+        Accepted on the console deploy + account endpoints in place of a session
+        token. Carries a fixed scope set (deploy / logs / read).
 
   schemas:
     TokenGrant:
@@ -378,6 +385,120 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/QueryResult" }
 
+  /account/tokens:
+    servers:
+      - url: https://console.roxyon.com
+    get:
+      operationId: listTokens
+      summary: List the caller's personal access tokens
+      security: [{ SessionToken: [] }]
+      responses:
+        "200":
+          description: tokens (no hash, no plaintext)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  tokens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        prefix: { type: string }
+                        scopes: { type: array, items: { type: string } }
+                        lastUsedAt: { type: [string, "null"] }
+                        expiresAt: { type: [string, "null"] }
+                        createdAt: { type: string }
+    post:
+      operationId: createToken
+      summary: Create a personal access token (secret shown once)
+      security: [{ SessionToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 60 }
+                scopes:
+                  type: array
+                  items: { type: string, enum: [deploy, logs, read] }
+                  default: [deploy, logs]
+                expiresInDays: { type: integer }
+      responses:
+        "200":
+          description: the new token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  token: { type: string, description: "roxp_… — shown once" }
+                  name: { type: string }
+                  scopes: { type: array, items: { type: string } }
+                  expiresAt: { type: [string, "null"] }
+    delete:
+      operationId: revokeToken
+      summary: Revoke a personal access token
+      security: [{ SessionToken: [] }]
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: revoked }
+
+  /account/context:
+    servers:
+      - url: https://console.roxyon.com
+    get:
+      operationId: accountContext
+      summary: The user + subscriptions + domains needed to plan a deploy
+      description: >
+        One call the CLI / MCP server use so a PAT-only client never touches the
+        BaaS. Resolvable by a session token or a PAT.
+      security: [{ SessionToken: [] }, { Pat: [] }]
+      responses:
+        "200":
+          description: context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  user:
+                    type: object
+                    properties: { id: { type: string }, email: { type: string } }
+                  scopes: { type: array, items: { type: string } }
+                  subscriptions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        status: { type: string }
+                        node: { type: string }
+                        datacenter: { type: string }
+                        container: { type: string }
+                  domains:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        subscription: { type: string }
+
   /applications/deploy:
     servers:
       - url: https://console.roxyon.com
@@ -389,12 +510,26 @@ paths:
         `ConfigRevision`; the reconciler then builds it in an isolated release
         directory and swaps it in. Rejects git-connected applications (push
         instead) and stopped applications.
-      security: [{ SessionToken: [] }]
+
+        Omit `application` and pass `host` + `runtime` (+ optional `folder`,
+        `runtimeVersion`, `preset`, `command`, `public`) to create the
+        application on the first deploy — so a CI job with only a PAT can deploy
+        a brand-new app in one call.
+      security: [{ SessionToken: [] }, { Pat: [] }]
       parameters:
         - name: application
           in: query
-          required: true
           schema: { type: string }
+          description: Existing application id. Omit to create one from `host` + `runtime`.
+        - name: host
+          in: query
+          schema: { type: string }
+        - name: folder
+          in: query
+          schema: { type: string }
+        - name: runtime
+          in: query
+          schema: { type: string, enum: [node, python, php] }
       requestBody:
         required: true
         content:
@@ -427,7 +562,7 @@ paths:
         the gzip tarball into `/home/www/<host>/public_html[/<folder>]`, served
         by nginx. No build, no process. Overlay semantics — files the archive
         omits are not deleted.
-      security: [{ SessionToken: [] }]
+      security: [{ SessionToken: [] }, { Pat: [] }]
       parameters:
         - name: host
           in: query

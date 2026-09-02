@@ -26,10 +26,11 @@ roxyon init          # writes roxyon.json
 roxyon deploy        # builds + uploads + waits for it to go live
 ```
 
-CI (no interactive login):
+CI (no interactive login) — create a token once, then use it as `ROXYON_TOKEN`:
 
 ```bash
-ROXYON_TOKEN=roxp_xxx roxyon deploy --no-follow
+roxyon token create ci --scopes deploy,logs      # prints roxp_… once
+ROXYON_TOKEN=roxp_xxx roxyon deploy --no-follow   # first run also creates the app
 ```
 
 From an AI assistant — add the MCP server to the client:

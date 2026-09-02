@@ -8,7 +8,14 @@ the deployed versions live in the Roxyon `_configs` tree:
 |---|---|
 | `ApplicationDeploy.php` | `_configs/app-x/console/clone/libs/ApplicationDeploy.php` |
 | `SiteDeploy.php` | `_configs/app-x/console/clone/libs/SiteDeploy.php` |
+| `AccountTokens.php` | `_configs/app-x/console/clone/libs/AccountTokens.php` — PAT management |
+| `AccountContext.php` | `_configs/app-x/console/clone/libs/AccountContext.php` — one PAT-safe context call |
+| `migrate-pat.php` | `_configs/app-x/console/clone/exec/migrate-pat.php` — run once on a node |
 | `app-source-apply.sh` | `_configs/x-x/scripts/clone/app-source-apply.sh` → `/usr/local/bin/` on every app node |
+
+Plus in `core/server.php`: `patIdentify()` + `apiCaller()` helpers (accept
+`Authorization: Bearer roxp_…` alongside `X-BEA-Session-Token`), and routing for
+`applications/deploy`, `sites/deploy`, `account/tokens`, `account/context`.
 
 Status: **written and wired in `_configs/…/clone/`, not yet synced to the nodes.**
 
@@ -54,42 +61,63 @@ Status: **written and wired in `_configs/…/clone/`, not yet synced to the node
 ## To deploy (per the `_configs` workflow)
 
 ```
-# console PHP:
-scp _configs/app-x/console/clone/libs/ApplicationDeploy.php  lb-1:/home/_configs/app-x/console/clone/libs/
-scp _configs/app-x/console/clone/libs/SiteDeploy.php          lb-1:/home/_configs/app-x/console/clone/libs/
-scp _configs/app-x/console/clone/core/server.php              lb-1:/home/_configs/app-x/console/clone/core/
-scp _configs/app-x/console/clone/libs/server_setup.php        lb-1:/home/_configs/app-x/console/clone/libs/
-scp _configs/app-x/console/clone/exec/worker.php              lb-1:/home/_configs/app-x/console/clone/exec/
-scp _configs/app-x/console/sync.sh                            lb-1:/home/_configs/app-x/console/    # trigger
+CL=_configs/app-x/console/clone
+# console PHP (new + modified):
+scp $CL/libs/{ApplicationDeploy,SiteDeploy,AccountTokens,AccountContext,ApplicationAction,ApplicationLogs,server_setup}.php  lb-1:/home/_configs/app-x/console/clone/libs/
+scp $CL/core/server.php   lb-1:/home/_configs/app-x/console/clone/core/
+scp $CL/exec/{worker,migrate-pat}.php  lb-1:/home/_configs/app-x/console/clone/exec/
+scp _configs/app-x/console/sync.sh   lb-1:/home/_configs/app-x/console/    # trigger
 
 # node script:
-scp _configs/x-x/scripts/clone/app-source-apply.sh           lb-1:/home/_configs/x-x/scripts/clone/
-scp _configs/x-x/scripts/sync.sh                             lb-1:/home/_configs/x-x/scripts/       # trigger
+scp _configs/x-x/scripts/clone/app-source-apply.sh  lb-1:/home/_configs/x-x/scripts/clone/
+scp _configs/x-x/scripts/sync.sh   lb-1:/home/_configs/x-x/scripts/       # trigger
 ```
 
-Then verify `sha256sum` Mac → lb-1 → node for each file and watch
-`/home/_configs/logs/{console-sync,scripts-sync}.log`.
+Then verify `sha256sum` Mac → lb-1 → node for each file, watch
+`/home/_configs/logs/{console-sync,scripts-sync}.log`, and **run the migration
+once** on any app node:
+
+```
+ssh lb-1 'ssh root@10.0.0.2 "php /var/www/console/exec/migrate-pat.php"'
+```
 
 ## Verify end to end
 
 ```bash
-# tiny archive
 mkdir -p /tmp/t && echo hi > /tmp/t/index.html && tar -czf /tmp/t.tgz -C /tmp/t .
+
+# --- with a session token (browser login) ---
+TOK=<session token>
+
+# create a PAT, then use it for everything else
+curl -sS -X POST https://console.roxyon.com/account/tokens \
+  -H "X-BEA-Session-Token: $TOK" -H 'Content-Type: application/json' \
+  -d '{"name":"test","scopes":["deploy","logs","read"]}'
+# -> {"ok":true,"token":"roxp_…", ...}
+PAT=roxp_…
+
+# --- everything below works with the PAT ---
+curl -sS https://console.roxyon.com/account/context -H "Authorization: Bearer $PAT"
+# -> {"ok":true,"user":{...},"subscriptions":[...],"domains":[...]}
 
 # static
 curl -sS -X POST "https://console.roxyon.com/sites/deploy?host=<yourhost>&folder=" \
-  -H "X-BEA-Session-Token: $TOK" -H 'Content-Type: application/gzip' \
-  --data-binary @/tmp/t.tgz
+  -H "Authorization: Bearer $PAT" -H 'Content-Type: application/gzip' --data-binary @/tmp/t.tgz
 # -> {"ok":true,"host":"...","path":"/","files":1,...}
 
-# app (needs an Applications row)
-curl -sS -X POST "https://console.roxyon.com/applications/deploy?application=<id>" \
-  -H "X-BEA-Session-Token: $TOK" -H 'Content-Type: application/gzip' \
-  --data-binary @/tmp/t.tgz
-# -> {"ok":true,"application":"<id>","configRevision":N,"files":1,...}
+# app — first call CREATES it (no ?application=)
+curl -sS -X POST "https://console.roxyon.com/applications/deploy?host=<yourhost>&folder=demo&runtime=node" \
+  -H "Authorization: Bearer $PAT" -H 'Content-Type: application/gzip' --data-binary @/tmp/t.tgz
+# -> {"ok":true,"application":"<newid>","created":true,"configRevision":1,...}
 
 # path traversal is refused
 tar -czf /tmp/bad.tgz -C /tmp --transform 's,^,../,' t/index.html
-curl -sS -X POST ".../applications/deploy?application=<id>" -H ... --data-binary @/tmp/bad.tgz
+curl -sS -X POST ".../sites/deploy?host=<yourhost>" -H "Authorization: Bearer $PAT" \
+  -H 'Content-Type: application/gzip' --data-binary @/tmp/bad.tgz
 # -> 502, log shows "Refusing unsafe archive members"
+
+# a token without the scope is refused
+curl -sS -X POST ".../applications/deploy?host=x&runtime=node" \
+  -H "Authorization: Bearer <read-only PAT>" --data-binary @/tmp/t.tgz
+# -> 403 "does not have the \"deploy\" scope"
 ```

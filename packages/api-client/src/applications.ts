@@ -44,8 +44,22 @@ interface Results<T> {
 export interface DeployResult {
   ok: boolean;
   application: string;
+  created?: boolean;
   configRevision?: number;
+  files?: number;
+  bytes?: number;
   error?: string;
+}
+
+/** Params for creating an application on its first deploy (no id yet). */
+export interface CreateOnDeploy {
+  host: string;
+  folder?: string;
+  runtime: 'node' | 'python' | 'php';
+  runtimeVersion?: string;
+  preset?: string;
+  command?: string;
+  public?: boolean;
 }
 
 export interface CreateApplicationInput {
@@ -178,17 +192,28 @@ export class ApplicationsApi {
     if (r?.error) throw new RoxyonApiError(r.error);
   }
 
-  /** Tail the app's journal. `POST /applications/logs`. Returns formatted lines. */
+  /**
+   * Tail the app's journal. `POST /applications/logs` returns one block per
+   * process (`{ type, unit, output }`); this flattens them to lines, each
+   * prefixed with the process type when there is more than one.
+   */
   async logs(applicationId: string, lines = 100): Promise<string[]> {
-    const r = await this.client.console<{ lines?: string[]; log?: string; error?: string }>(
-      'POST',
-      '/applications/logs',
-      { body: { application: applicationId, lines }, tolerateHttpError: true },
-    );
+    const r = await this.client.console<{
+      processes?: Array<{ type?: string; unit?: string; output?: string }>;
+      error?: string;
+    }>('POST', '/applications/logs', {
+      body: { application: applicationId, lines },
+      tolerateHttpError: true,
+    });
     if (r?.error) throw new RoxyonApiError(r.error);
-    if (Array.isArray(r?.lines)) return r.lines;
-    if (typeof r?.log === 'string') return r.log.split('\n');
-    return [];
+    const procs = r?.processes ?? [];
+    const multi = procs.length > 1;
+    const out: string[] = [];
+    for (const p of procs) {
+      const body = (p.output ?? '').split('\n').filter(Boolean);
+      for (const line of body) out.push(multi ? `[${p.type ?? 'web'}] ${line}` : line);
+    }
+    return out;
   }
 
   /** Connect a git remote for push-to-deploy. `POST /applications/repo/connect`. */
@@ -226,9 +251,21 @@ export class ApplicationsApi {
    *
    * `POST /applications/deploy` — NEW endpoint (see `backend/` in this repo).
    */
-  async uploadSource(applicationId: string, tarball: Uint8Array): Promise<DeployResult> {
+  async uploadSource(target: string | CreateOnDeploy, tarball: Uint8Array): Promise<DeployResult> {
+    const query: Record<string, string> =
+      typeof target === 'string'
+        ? { application: target }
+        : {
+            host: target.host,
+            folder: target.folder ?? '',
+            runtime: target.runtime,
+            ...(target.runtimeVersion ? { runtimeVersion: target.runtimeVersion } : {}),
+            ...(target.preset ? { preset: target.preset } : {}),
+            ...(target.command ? { command: target.command } : {}),
+            public: target.public === false ? '0' : '1',
+          };
     const r = await this.client.console<DeployResult>('POST', '/applications/deploy', {
-      query: { application: applicationId },
+      query,
       headers: { 'content-type': 'application/gzip' },
       body: tarball,
       tolerateHttpError: true,

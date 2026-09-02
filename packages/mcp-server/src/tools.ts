@@ -29,9 +29,9 @@ async function resolveApp(args: { application?: string; dir?: string }): Promise
   throw new Error('Pass either "application" (an id) or "dir" (a project directory).');
 }
 
-async function activeSubscription(session: RoxyonSession) {
-  const user = await session.roxyon.auth.me();
-  return session.roxyon.subscriptions.resolve(user.objectId, session.preferredSubscription);
+/** The account context (user + subscriptions + domains) — one call, PAT-safe. */
+function accountContext(session: RoxyonSession) {
+  return session.roxyon.account.context();
 }
 
 export function registerTools(server: McpServer): void {
@@ -46,26 +46,24 @@ export function registerTools(server: McpServer): void {
     () =>
       guard(async () => {
         const session = await getSession();
-        const user = await session.roxyon.auth.me();
-        const subs = await session.roxyon.subscriptions.list(user.objectId);
-        const active = await session.roxyon.subscriptions
-          .resolve(user.objectId, session.preferredSubscription)
-          .catch(() => undefined);
+        const ctx = await accountContext(session);
         const lines = [
-          `User: ${user.Email ?? user.Username ?? user.objectId} (${user.objectId})`,
-          `Auth: ${session.source}`,
+          `User: ${ctx.user.email || ctx.user.id} (${ctx.user.id})`,
+          `Auth: ${session.source}${ctx.scopes.length ? ` (scopes: ${ctx.scopes.join(', ')})` : ''}`,
           '',
           'Subscriptions:',
-          ...subs.map(
+          ...ctx.subscriptions.map(
             (s) =>
-              `  ${s.objectId === active?.objectId ? '→' : ' '} ${s.Name ?? s.objectId}` +
-              ` — ${s.Status ?? '?'}${s.Datacenter ? ` · ${s.Datacenter}` : ''}`,
+              `  ${s.name || s.id} — ${s.status || '?'}${s.datacenter ? ` · ${s.datacenter}` : ''}`,
           ),
+          '',
+          `Hosts: ${ctx.domains.map((d) => d.name).join(', ') || '(none)'}`,
         ];
         return text(lines.join('\n'), {
-          user: { id: user.objectId, email: user.Email },
-          subscriptions: subs.map((s) => ({ id: s.objectId, name: s.Name, status: s.Status })),
-          active: active?.objectId,
+          user: ctx.user,
+          scopes: ctx.scopes,
+          subscriptions: ctx.subscriptions,
+          hosts: ctx.domains.map((d) => d.name),
         });
       }),
   );
@@ -82,13 +80,12 @@ export function registerTools(server: McpServer): void {
     () =>
       guard(async () => {
         const session = await getSession();
-        const sub = await activeSubscription(session);
-        const domains = await session.roxyon.domains.list(sub.objectId);
+        const { domains } = await accountContext(session);
         return text(
           domains.length
-            ? domains.map((d) => `- ${d.Name}`).join('\n')
-            : '(no hosts on this subscription)',
-          { hosts: domains.map((d) => d.Name) },
+            ? domains.map((d) => `- ${d.name}`).join('\n')
+            : '(no hosts on this account)',
+          { hosts: domains.map((d) => d.name) },
         );
       }),
   );
@@ -105,8 +102,10 @@ export function registerTools(server: McpServer): void {
     () =>
       guard(async () => {
         const session = await getSession();
-        const sub = await activeSubscription(session);
-        const apps = await session.roxyon.applications.list(sub.objectId);
+        const ctx = await accountContext(session);
+        const sub = ctx.subscriptions[0];
+        if (!sub) return text('(no subscription on this account)', { applications: [] });
+        const apps = await session.roxyon.applications.list(sub.id);
         const body = apps.length
           ? apps
               .map(
@@ -156,19 +155,18 @@ export function registerTools(server: McpServer): void {
             { config: existing },
           );
         }
-        const sub = await activeSubscription(session);
-        const domains = await session.roxyon.domains.list(sub.objectId);
+        const { domains } = await accountContext(session);
         if (domains.length === 0) {
           return errorResult(
-            'This subscription has no hosts. Add a domain in the Roxyon console first.',
+            'This account has no hosts. Add a domain in the Roxyon console first.',
           );
         }
         const detected = await detectRuntime(args.dir);
         const runtime = args.runtime ?? detected.runtime;
-        const host = args.host ?? domains[0]!.Name;
-        if (!domains.some((d) => d.Name === host)) {
+        const host = args.host ?? domains[0]!.name;
+        if (!domains.some((d) => d.name === host)) {
           return errorResult(
-            `Host "${host}" is not on this subscription (have: ${domains.map((d) => d.Name).join(', ')}).`,
+            `Host "${host}" is not on this account (have: ${domains.map((d) => d.name).join(', ')}).`,
           );
         }
         const config = buildProjectConfig({

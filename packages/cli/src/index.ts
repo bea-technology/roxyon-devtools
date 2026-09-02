@@ -5,6 +5,7 @@ import { init } from './commands/init.js';
 import { login, logout } from './commands/login.js';
 import { logs } from './commands/logs.js';
 import { link, open, restart } from './commands/misc.js';
+import { tokenCreate, tokenList, tokenRevoke } from './commands/token.js';
 import { whoami } from './commands/whoami.js';
 import { CliError, EXIT, ui } from './ui.js';
 
@@ -88,6 +89,24 @@ program
   .command('open')
   .description("Open the project's URL in a browser")
   .action(() => run(open));
+
+const token = program
+  .command('token')
+  .description('Manage personal access tokens (for CI and the MCP server)');
+token
+  .command('create <name>')
+  .description('Create a token — prints the secret once')
+  .option('--scopes <list>', 'comma-separated: deploy,logs,read', 'deploy,logs')
+  .option('--expires <days>', 'expire after N days', (v) => Number.parseInt(v, 10))
+  .action((name, opts) => run(() => tokenCreate(name, opts)));
+token
+  .command('list')
+  .description('List your tokens')
+  .action(() => run(tokenList));
+token
+  .command('revoke <id>')
+  .description('Revoke a token')
+  .action((id) => run(() => tokenRevoke(id)));
 
 program
   .command('link [repoUrl]')
