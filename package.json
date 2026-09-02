@@ -1,0 +1,26 @@
+{
+  "name": "roxyon-devtools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Roxyon developer platform — CLI, API client, and MCP server for deploying LumenJS apps and web projects to Roxyon infrastructure from any environment (including AI assistants).",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "changeset": "changeset",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@changesets/cli": "^2.27.9",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.3"
+  }
+}

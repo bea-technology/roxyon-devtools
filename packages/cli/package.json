@@ -1,0 +1,38 @@
+{
+  "name": "@roxyon/cli",
+  "version": "0.1.0",
+  "description": "Deploy LumenJS apps and web projects to Roxyon infrastructure from anywhere — including AI assistants.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "roxyon": "./bin/roxyon.js"
+  },
+  "files": ["dist", "bin"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "node --experimental-strip-types src/index.ts"
+  },
+  "engines": { "node": ">=20" },
+  "keywords": ["roxyon", "lumenjs", "deploy", "baas", "paas", "cli"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bea-technology/roxyon-devtools.git",
+    "directory": "packages/cli"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "@roxyon/api-client": "workspace:*",
+    "commander": "^12.1.0",
+    "ignore": "^5.3.2",
+    "picocolors": "^1.1.1",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.3"
+  }
+}
