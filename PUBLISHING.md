@@ -1,63 +1,64 @@
 # Publishing
 
-Five packages ship to npm under the **`roxyon`** org (plus the unscoped
-`create-roxyon-app`):
+Six things ship from this repo:
 
-| Package | bin |
+| npm | what |
 |---|---|
-| `@roxyon/api-client` | — |
-| `@roxyon/deploy-core` | — |
-| `@roxyon/cli` | `roxyon` |
-| `@roxyon/mcp` | `roxyon-mcp` |
-| `create-roxyon-app` | `create-roxyon-app` |
+| `@roxyon/api-client` | typed BaaS + deploy client |
+| `@roxyon/deploy-core` | shared deploy pipeline |
+| `@roxyon/cli` (`roxyon`) | the CLI |
+| `@roxyon/mcp` (`roxyon-mcp`) | the MCP server |
+| `create-roxyon-app` | scaffolder |
 
-## First release (0.1.0)
+Plus `integrations/mcp-registry/server.json` → the **MCP registry**.
+
+## 0.1.0 — already published (2026-09-02)
+
+All five packages are live at `0.1.0` under the `roxyon` npm org
+(maintainer `bea.technology`). If you ever need to redo a first publish
+manually:
 
 ```bash
-# 1. auth — a member of the `roxyon` npm org
 npm login
-
-# 2. clean build + full check
-pnpm install
-pnpm -r build && pnpm -r typecheck && pnpm -r test && pnpm lint
-
-# 3. publish, in dependency order, with workspace:* rewritten to real versions
-pnpm -r publish --access public
-#   add --otp=123456 if the org requires 2FA
-#   add --no-git-checks if publishing from a dirty/branch checkout
+pnpm install && pnpm -r build && pnpm -r test
+pnpm -r publish --access public --no-git-checks
 ```
 
-**Use `pnpm publish`, not `npm publish`** — only pnpm rewrites the `workspace:*`
-dependency ranges to the actual published versions. `npm publish` would ship
-`"@roxyon/api-client": "workspace:*"` verbatim and every install would break.
+Use **`pnpm publish`, never `npm publish`** — only pnpm rewrites the
+`workspace:*` dep ranges. And set the npm org's **default package visibility to
+Public** (`npmjs.com/settings/roxyon/package-settings`) or scoped packages
+publish private.
 
-`prepublishOnly` runs `tsup` for each package, so step 2's build is belt-and-braces.
+## Every release after this one — automated
 
-## Verify
+`.github/workflows/release.yml` runs on push to `main`:
+
+1. Pending changesets → opens/updates a **"Version Packages" PR**.
+2. Merge that PR → the workflow bumps versions, writes CHANGELOGs, and
+   **publishes to npm** and **updates the MCP registry**.
+
+No tokens if you set up **OIDC trusted publishing** (recommended):
+
+- npm: each package → Settings → **Trusted Publisher** → GitHub Actions,
+  repo `bea-technology/roxyon-devtools`, workflow `release.yml`.
+- MCP registry: nothing to configure — the workflow authenticates with GitHub
+  OIDC for the `io.github.bea-technology/*` namespace.
+
+Fallback if you skip OIDC: add an `NPM_TOKEN` repo secret (granular, write to the
+`@roxyon` scope + `create-roxyon-app`) — the workflow picks it up.
+
+### Cutting a release
 
 ```bash
-npm view @roxyon/cli
-npx --yes @roxyon/cli@latest --help
-npx --yes create-roxyon-app@latest --help
-npx --yes @roxyon/mcp@latest --version
-```
-
-## Subsequent releases
-
-Use changesets:
-
-```bash
-pnpm changeset            # describe the change, pick bump levels
-pnpm changeset version    # bumps versions + writes CHANGELOGs
-git commit -am "Version packages"
-pnpm -r build && pnpm -r publish
+pnpm changeset          # describe the change, pick bump levels
+git add -A && git commit -m "…" && git push
+# → merge the "Version Packages" PR the bot opens
 ```
 
 ## Notes
 
 - `@roxyon/api-client`'s `constants.ts` embeds the console's **public** App-ID +
-  JavaScript-Key (they ship in `console.roxyon.com`'s browser bundle). There's a
-  TODO to provision a dedicated `roxyon-cli` BaaS app; swap them there when it
-  exists — no breaking change for consumers.
-- `@roxyon/mcp` ships `resources/lumenjs.md` (~91 KB) — the full LumenJS
-  reference, served as an MCP resource. Intentional.
+  JavaScript-Key. Swap for a dedicated `roxyon-cli` BaaS app when one exists —
+  not a breaking change.
+- `@roxyon/mcp` ships `resources/lumenjs.md` (~91 KB, the full LumenJS
+  reference) as an MCP resource — intentional.
