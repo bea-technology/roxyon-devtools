@@ -17,13 +17,13 @@ jobs:
     outputs:
       published: ${{ steps.changesets.outputs.published }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -64,7 +64,7 @@ jobs:
       id-token: write # GitHub OIDC → MCP registry (io.github.* namespace)
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Sync server.json version from @roxyon/mcp
         run: |
           V=$(node -p "require('./packages/mcp-server/package.json').version")
