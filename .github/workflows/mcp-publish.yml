@@ -1,0 +1,41 @@
+name: Publish to MCP Registry
+
+# Run manually: Actions → "Publish to MCP Registry" → Run workflow.
+# Use this for the first publish and any out-of-band re-publish. On a normal
+# release, the mcp-registry job in release.yml does it automatically.
+# Auth is GitHub OIDC for the io.github.bea-technology/* namespace — no tokens.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync server.json version from @roxyon/mcp
+        run: |
+          V=$(node -p "require('./packages/mcp-server/package.json').version")
+          node -e "
+            const f='integrations/mcp-registry/server.json';
+            const j=require('./'+f);
+            j.version='$V';
+            j.packages[0].version='$V';
+            require('fs').writeFileSync(f, JSON.stringify(j, null, 2) + '\n');
+          "
+
+      - name: Install mcp-publisher
+        run: |
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" \
+            | tar -xz mcp-publisher
+          chmod +x ./mcp-publisher
+
+      - name: Publish
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish ./integrations/mcp-registry/server.json
