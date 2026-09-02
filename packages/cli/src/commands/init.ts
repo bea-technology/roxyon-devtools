@@ -1,10 +1,14 @@
 import { basename } from 'node:path';
 import * as p from '@clack/prompts';
 import { isCancel } from '@clack/prompts';
-import { LUMEN_BUILD, RUNTIMES, type RuntimeName } from '@roxyon/api-client';
-import { type ProjectConfig, loadProjectConfig, saveProjectConfig } from '../config.js';
+import type { RuntimeName } from '@roxyon/api-client';
+import {
+  buildProjectConfig,
+  detectRuntime,
+  loadProjectConfig,
+  saveProjectConfig,
+} from '@roxyon/deploy-core';
 import { requireSession } from '../context.js';
-import { detectRuntime } from '../detect.js';
 import { EXIT, fail, ui } from '../ui.js';
 
 export interface InitOptions {
@@ -42,7 +46,7 @@ export async function init(opts: InitOptions): Promise<void> {
     ? opts.runtime
     : opts.yes
       ? detected.runtime
-      : await ask(() =>
+      : await ask<RuntimeName>(() =>
           p.select({
             message: 'Runtime',
             initialValue: detected.runtime,
@@ -65,7 +69,6 @@ export async function init(opts: InitOptions): Promise<void> {
             options: domains.map((d) => ({ value: d.Name, label: d.Name })),
           }),
         ));
-  if (!host) fail('A host is required.', EXIT.configError);
 
   const defaultFolder = basename(cwd).replace(/[^a-z0-9._-]/gi, '-');
   const folder =
@@ -74,7 +77,7 @@ export async function init(opts: InitOptions): Promise<void> {
       ? runtime === 'lumen'
         ? ''
         : defaultFolder
-      : await ask(() =>
+      : await ask<string>(() =>
           p.text({
             message:
               runtime === 'lumen'
@@ -85,25 +88,14 @@ export async function init(opts: InitOptions): Promise<void> {
           }),
         ));
 
-  const config: ProjectConfig = {
-    name: basename(cwd),
-    host,
-    folder: String(folder).replace(/^\/+|\/+$/g, ''),
+  const config = buildProjectConfig({
+    cwd,
     runtime,
-    kind: runtime === 'lumen' ? 'static' : 'app',
-  };
-
-  if (runtime === 'lumen') {
-    config.build = LUMEN_BUILD.command;
-    config.outDir = LUMEN_BUILD.outDir;
-  } else {
-    const spec = RUNTIMES[runtime];
-    config.runtimeVersion = spec.defaultVersion;
-    config.preset = spec.presets[0]?.[0];
-    config.start = detected.start ?? spec.command;
-    config.public = true;
-    config.build = '';
-  }
+    host,
+    folder,
+    name: basename(cwd),
+    start: detected.start,
+  });
 
   const path = await saveProjectConfig(config, cwd);
   ui.success(`Wrote ${path}`);

@@ -1,32 +1,31 @@
 {
-  "name": "@roxyon/cli",
+  "name": "@roxyon/mcp",
   "version": "0.1.0",
-  "description": "Deploy LumenJS apps and web projects to Roxyon infrastructure from anywhere — including AI assistants.",
+  "description": "Model Context Protocol server for Roxyon — lets any MCP-capable AI assistant build with LumenJS, use the Roxyon BaaS, and deploy to Roxyon infrastructure.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "roxyon": "./bin/roxyon.js"
+    "roxyon-mcp": "./bin/roxyon-mcp.js"
   },
-  "files": ["dist", "bin"],
+  "files": ["dist", "bin", "resources"],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "node --experimental-strip-types src/index.ts"
+    "start": "node bin/roxyon-mcp.js"
   },
   "engines": { "node": ">=20" },
-  "keywords": ["roxyon", "lumenjs", "deploy", "baas", "paas", "cli"],
+  "keywords": ["mcp", "modelcontextprotocol", "roxyon", "lumenjs", "deploy", "baas"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bea-technology/roxyon-devtools.git",
-    "directory": "packages/cli"
+    "directory": "packages/mcp-server"
   },
   "dependencies": {
-    "@clack/prompts": "^0.7.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "@roxyon/api-client": "workspace:*",
     "@roxyon/deploy-core": "workspace:*",
-    "commander": "^12.1.0",
-    "picocolors": "^1.1.1"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.16.11",

@@ -4,9 +4,18 @@ Contributor guide for humans and coding agents working in this repo.
 
 ## What this is
 
-A pnpm/TypeScript monorepo. `@roxyon/api-client` wraps the Roxyon BaaS and the
-console deploy endpoints; `@roxyon/cli` is the `roxyon` command built on it.
-`backend/` holds reference PHP for two new console endpoints (not built here).
+A pnpm/TypeScript monorepo:
+
+- `@roxyon/api-client` — wraps the Roxyon BaaS (`RX` engine) and the console
+  deploy endpoints. No filesystem, no build tooling — pure HTTP.
+- `@roxyon/deploy-core` — the shared deploy pipeline (detection, archiving,
+  `deployProject()` orchestration, credential helpers). Depends on api-client.
+- `@roxyon/cli` — the `roxyon` command. Thin; delegates deploy/init to deploy-core.
+- `@roxyon/mcp` — stdio MCP server. Thin wrapper over api-client + deploy-core.
+- `backend/` — reference PHP for two new console endpoints (not built here).
+
+Dependency direction is one-way: `api-client ← deploy-core ← {cli, mcp}`. Never
+import cli internals from mcp (or vice-versa) — put shared code in deploy-core.
 
 ## Ground rules
 
@@ -52,11 +61,23 @@ packages/api-client/src/
   sites.ts          static-site upload
   subscriptions.ts  Privileges -> Subscriptions resolution
   domains.ts, env.ts, runtimes.ts, query.ts, errors.ts
+packages/deploy-core/src/
+  archive.ts        tar+gzip with .roxyonignore / .gitignore, deterministic
+  detect.ts         project-type detection for `init`
+  project.ts        roxyon.json load/save + buildProjectConfig()
+  credentials.ts    ~/.roxyon/config.json + env overrides
+  deploy.ts         deployProject() — build -> pack -> upload -> poll, event-reported
+  run-command.ts    default build-command spawner
 packages/cli/src/
   index.ts          commander wiring
-  commands/*.ts     one file per command group
-  config.ts         ~/.roxyon/config.json + roxyon.json
-  archive.ts        tar+gzip with .roxyonignore / .gitignore
-  detect.ts         project-type detection for `init`
+  commands/*.ts     one file per command group (thin; call deploy-core)
+  config.ts         re-exports deploy-core config
+  context.ts, ui.ts
+packages/mcp-server/src/
+  server.ts         createServer() — wires tools + resources + prompts
+  tools.ts          the 11 roxyon_* tools (guard() wraps errors)
+  resources.ts      roxyon://docs/{lumenjs,baas,deploy}
+  prompts.ts, session.ts, result.ts
+packages/mcp-server/resources/   lumenjs.md (copied spec), baas.md, deploy.md
 backend/            reference PHP + shell for the new console endpoints
 ```

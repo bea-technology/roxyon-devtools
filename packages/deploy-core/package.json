@@ -1,0 +1,40 @@
+{
+  "name": "@roxyon/deploy-core",
+  "version": "0.1.0",
+  "description": "Shared deploy pipeline for Roxyon tooling — project detection, archiving, and the build/upload/poll orchestration used by @roxyon/cli and @roxyon/mcp.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": { "node": ">=20" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bea-technology/roxyon-devtools.git",
+    "directory": "packages/deploy-core"
+  },
+  "dependencies": {
+    "@roxyon/api-client": "workspace:*",
+    "ignore": "^5.3.2",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.3"
+  }
+}

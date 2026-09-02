@@ -1,11 +1,10 @@
-import { createReadStream } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import ignore, { type Ignore } from 'ignore';
 import { create as tarCreate } from 'tar';
 
 /** Always excluded, regardless of ignore files — build artefacts and VCS/OS cruft. */
-const ALWAYS_IGNORE = [
+export const ALWAYS_IGNORE = [
   'node_modules',
   '.git',
   '.next',
@@ -83,8 +82,7 @@ export async function packDirectory(
       gzip: true,
       cwd: root,
       portable: true,
-      // stable mtime -> byte-identical archive for an unchanged tree
-      mtime: new Date(0),
+      mtime: new Date(0), // stable -> byte-identical archive for an unchanged tree
       prefix: opts.prefix,
       follow: false,
     },
@@ -107,7 +105,7 @@ export async function packDirectory(
   return { buffer: Buffer.concat(chunks), files, bytes };
 }
 
-/** Total on-disk size of a set of files (for a pre-pack sanity check / progress). */
+/** Total on-disk size of a set of files. */
 export async function measure(root: string, files: string[]): Promise<number> {
   let total = 0;
   for (const f of files) {
@@ -119,6 +117,3 @@ export async function measure(root: string, files: string[]): Promise<number> {
   }
   return total;
 }
-
-// re-export so the deploy command can stream without importing 'node:fs' itself
-export { createReadStream };

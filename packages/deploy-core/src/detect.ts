@@ -38,7 +38,6 @@ export async function detectRuntime(root: string): Promise<Detection> {
     hasViews = false;
   }
 
-  // LumenJS project: config.json + src/views, no server framework.
   if (hasConfigJson && hasViews) {
     const deps = {
       ...(pkg?.dependencies as object),
@@ -75,6 +74,5 @@ export async function detectRuntime(root: string): Promise<Detection> {
     return { runtime: 'php', reason: 'composer.json / server.php', start: 'php8.4 server.php' };
   }
 
-  // Nothing obvious — treat as a static site.
   return { runtime: 'lumen', reason: 'no framework markers — treating as a static site' };
 }

@@ -7,9 +7,10 @@ from anywhere.
 | Package | What it is | Status |
 |---|---|---|
 | [`@roxyon/api-client`](packages/api-client) | Typed client for the Roxyon BaaS (`RX` engine) + the Applications/Sites deploy endpoints | **M1** |
+| [`@roxyon/deploy-core`](packages/deploy-core) | Shared deploy pipeline — project detection, archiving, build/upload/poll orchestration | **M1** |
 | [`@roxyon/cli`](packages/cli) | `roxyon` — `login`, `init`, `deploy`, `logs`, `env`, `restart`, `open`, `link` | **M1** |
+| [`@roxyon/mcp`](packages/mcp-server) | MCP server (stdio) so Claude Code / Cursor / Gemini CLI / … can drive all of the above | **M2** — stdio done; HTTP+OAuth pending |
 | `backend/` | Reference implementation of the two new console endpoints the CLI needs | **M1** — spec + drafts |
-| `@roxyon/mcp` | MCP server so Claude / ChatGPT / Gemini / Cursor / … can drive all of the above | M2 (planned) |
 | `create-roxyon-app` | Scaffolder that emits `AGENTS.md` + `roxyon.json` + `llms.txt` | M4 (planned) |
 
 See [`docs/roadmap.md`](docs/roadmap.md) for the full plan.
@@ -29,6 +30,15 @@ CI (no interactive login):
 ```bash
 ROXYON_TOKEN=roxp_xxx roxyon deploy --no-follow
 ```
+
+From an AI assistant — add the MCP server to the client:
+
+```json
+{ "mcpServers": { "roxyon": { "command": "npx", "args": ["-y", "@roxyon/mcp"] } } }
+```
+
+then the assistant calls `roxyon_init` and `roxyon_deploy`. See
+[`packages/mcp-server`](packages/mcp-server).
 
 ## Develop
 
