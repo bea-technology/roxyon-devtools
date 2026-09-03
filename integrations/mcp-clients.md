@@ -1,8 +1,25 @@
 # Add the Roxyon MCP server to any client
 
-The server runs on **stdio** as `npx -y @roxyon/mcp`. Authenticate once with
-`roxyon login`, or set `ROXYON_TOKEN` (a `roxp_…` PAT — `roxyon token create`)
-in the client's `env`.
+Two ways to connect:
+
+- **Local (stdio)** — `npx -y @roxyon/mcp`. Authenticate once with `roxyon login`,
+  or set `ROXYON_TOKEN` (a `roxp_…` PAT — `roxyon token create`) in the client's
+  `env`. Full tool set including `roxyon_init` / `roxyon_deploy` (they need your
+  local project files).
+- **Remote (hosted)** — `https://mcp.roxyon.com/mcp`. OAuth 2.1: the client
+  registers itself, you sign in with your Roxyon account and approve a consent
+  screen — no token to paste. Nine API-shaped tools; `roxyon_init` /
+  `roxyon_deploy` return a "use the CLI locally" message (use
+  `roxyon_link_github` + push instead).
+
+## Remote — claude.ai / ChatGPT / Cursor (URL)
+
+| Client | Where |
+|---|---|
+| claude.ai | Settings → Connectors → Add custom connector → `https://mcp.roxyon.com/mcp` |
+| ChatGPT | Settings → Connectors → add `https://mcp.roxyon.com/mcp` (dev mode / Pro) |
+| Cursor | Settings → MCP → Add Custom MCP → Type **URL** → `https://mcp.roxyon.com/mcp` |
+| Claude Code | `claude mcp add --transport http roxyon https://mcp.roxyon.com/mcp` |
 
 ## Claude Code
 
