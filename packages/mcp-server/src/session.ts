@@ -1,11 +1,12 @@
 import { Roxyon, isAuthError } from '@roxyon/api-client';
 import { endpointsFromEnv, loadCredentials, tokenFromEnv } from '@roxyon/deploy-core';
+import { currentContext } from './context.js';
 
 export interface RoxyonSession {
   roxyon: Roxyon;
   preferredSubscription?: string;
   /** how the session was authenticated, for diagnostics */
-  source: 'env-token' | 'stored-login';
+  source: 'env-token' | 'stored-login' | 'oauth';
 }
 
 export class NotAuthenticatedError extends Error {
@@ -24,6 +25,17 @@ export class NotAuthenticatedError extends Error {
  */
 export async function getSession(): Promise<RoxyonSession> {
   const { apiUrl, consoleUrl } = endpointsFromEnv();
+
+  // HTTP transport: the bearer token from this request wins over any ambient
+  // env/stored credentials, and each request gets its own client.
+  const requestToken = currentContext().token;
+  if (requestToken) {
+    return {
+      roxyon: new Roxyon({ sessionToken: requestToken, baseUrl: apiUrl, consoleUrl }),
+      source: 'oauth',
+    };
+  }
+
   const envToken = tokenFromEnv();
   if (envToken) {
     return {

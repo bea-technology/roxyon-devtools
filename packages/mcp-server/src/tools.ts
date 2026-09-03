@@ -10,8 +10,27 @@ import {
   saveProjectConfig,
 } from '@roxyon/deploy-core';
 import { z } from 'zod';
+import { currentContext } from './context.js';
 import { type ToolResult, errorResult, guard, text } from './result.js';
 import { type RoxyonSession, getSession } from './session.js';
+
+/**
+ * `roxyon_init` / `roxyon_deploy` read and write the caller's local project
+ * directory — impossible over the remote HTTP server. Returns an explanatory
+ * result when running in that mode, `null` otherwise (proceed).
+ */
+function remoteFilesystemBlock(tool: 'roxyon_init' | 'roxyon_deploy'): ToolResult | null {
+  if (!currentContext().remote) return null;
+  return errorResult(
+    [
+      `${tool} needs access to your local project files, which the hosted Roxyon MCP`,
+      'server does not have. Either:',
+      '  • run the `roxyon` CLI locally (`npm i -g @roxyon/cli`, then `roxyon deploy`), or',
+      '  • use `roxyon_link_github` to connect a git repo for push-to-deploy, then',
+      '    `roxyon_app_status` / `roxyon_logs` to watch it here.',
+    ].join('\n'),
+  );
+}
 
 /** Resolve an application id from an explicit id or a project directory. */
 async function resolveApp(args: { application?: string; dir?: string }): Promise<{
@@ -135,6 +154,8 @@ export function registerTools(server: McpServer): void {
     },
     (args) =>
       guard(async () => {
+        const blocked = remoteFilesystemBlock('roxyon_init');
+        if (blocked) return blocked;
         const session = await getSession();
         const existing = await loadProjectConfig(args.dir);
         if (existing && !args.overwrite) {
@@ -196,6 +217,8 @@ export function registerTools(server: McpServer): void {
     },
     (args) =>
       guard(async () => {
+        const blocked = remoteFilesystemBlock('roxyon_deploy');
+        if (blocked) return blocked;
         const session = await getSession();
         const config = await loadProjectConfig(args.dir);
         if (!config) {
