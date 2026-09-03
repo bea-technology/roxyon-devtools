@@ -53,15 +53,22 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
           # No NODE_AUTH_TOKEN: publishing uses OIDC trusted publishing.
 
-      # Keep the MCP registry in step with the published @roxyon/mcp version.
-      # No-ops on every ordinary push (versions already match); only publishes
-      # after a release bumped it. Manual re-run: Actions → "Publish to MCP Registry".
+      # Keep the MCP registry (and the checked-in server.json) in step with the
+      # published @roxyon/mcp version. No-ops on every ordinary push; only
+      # publishes after a release bumped it. Manual re-run: Actions →
+      # "Publish to MCP Registry".
       - name: Update MCP registry
         run: |
+          SERVER_NAME="io.github.bea-technology/roxyon"
           MCP_V=$(node -p "require('./packages/mcp-server/package.json').version")
-          REG_V=$(curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=roxyon" \
-            | node -p "JSON.parse(require('fs').readFileSync(0)).servers?.[0]?.server?.version || ''")
-          if [ "$MCP_V" = "$REG_V" ]; then echo "registry already at $MCP_V — nothing to do"; exit 0; fi
+          # The registry returns one row per published version — skip only if a
+          # row for OUR name already carries this exact version.
+          HAVE=$(curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=roxyon" | node -e "
+            const d=JSON.parse(require('fs').readFileSync(0));
+            const hit=(d.servers||[]).some(s=>s.server?.name==='$SERVER_NAME' && s.server?.version==='$MCP_V');
+            process.stdout.write(hit?'yes':'no');
+          ")
+          if [ "$HAVE" = "yes" ]; then echo "registry already has $SERVER_NAME@$MCP_V — nothing to do"; exit 0; fi
           node -e "
             const f='integrations/mcp-registry/server.json';
             const j=require('./'+f);
@@ -72,3 +79,12 @@ jobs:
           chmod +x ./mcp-publisher
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish ./integrations/mcp-registry/server.json
+          # Commit the version bump back so the repo file doesn't drift. Best
+          # effort — the publish above already succeeded; a failed push here
+          # (e.g. a concurrent commit to main) must not fail the release.
+          if ! git diff --quiet -- integrations/mcp-registry/server.json; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: sync mcp-registry server.json to $MCP_V [skip ci]" -- integrations/mcp-registry/server.json
+            git push origin "HEAD:${GITHUB_REF_NAME}" || echo "::warning::could not push server.json sync — do it manually"
+          fi

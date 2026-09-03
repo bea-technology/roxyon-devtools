@@ -23,10 +23,12 @@ URL.
 
 Publish `@roxyon/mcp` and submit to:
 
-- Anthropic MCP registry
+- The official MCP registry (`registry.modelcontextprotocol.io`) — **done**;
+  this is now the canonical listing. `modelcontextprotocol/servers` retired its
+  README list in favour of the registry, so there is no PR to open there.
 - Cursor's MCP directory
-- Smithery (`smithery.ai`), Glama (`glama.ai`), PulseMCP, `mcp.so`
-- The `@modelcontextprotocol/servers` community list (PR)
+- Smithery (`smithery.ai`) — manual submit
+- Glama (`glama.ai`), PulseMCP, `mcp.so` — auto-index from the registry
 
 Each listing needs: the `npx @roxyon/mcp` command, the tool list, and the auth
 note (`roxyon login` or `ROXYON_TOKEN`).
