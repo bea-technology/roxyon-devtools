@@ -9,7 +9,7 @@ from anywhere.
 | [`@roxyon/api-client`](packages/api-client) | Typed client for the Roxyon BaaS (`RX` engine) + the Applications/Sites deploy endpoints | **M1** |
 | [`@roxyon/deploy-core`](packages/deploy-core) | Shared deploy pipeline — project detection, archiving, build/upload/poll orchestration | **M1** |
 | [`@roxyon/cli`](packages/cli) | `roxyon` — `login`, `init`, `deploy`, `logs`, `env`, `restart`, `open`, `link` | **M1** |
-| [`@roxyon/mcp`](packages/mcp-server) | MCP server (stdio) so Claude Code / Cursor / Gemini CLI / … can drive all of the above | **M2** — stdio done; HTTP+OAuth pending |
+| [`@roxyon/mcp`](packages/mcp-server) | MCP server — **stdio** (`roxyon-mcp`) for local clients, **remote Streamable HTTP + OAuth** (`roxyon-mcp-http`) for hosted connectors | **M2** |
 | [`backend/`](backend) | The two new console endpoints + node script (`/applications/deploy`, `/sites/deploy`, `app-source-apply.sh`) | written & wired in `_configs`, not synced |
 | [`docs/`](docs) | `llms.txt`, BaaS OpenAPI 3.1, `AGENTS.md` template, distribution checklist | **M3** — drafted |
 | [`create-roxyon-app`](packages/create-roxyon-app) | `npm create roxyon-app` — LumenJS / Node templates, emits `AGENTS.md` + `roxyon.json` + `llms.txt` + editor rules | **M4** |
@@ -36,14 +36,36 @@ roxyon token create ci --scopes deploy,logs      # prints roxp_… once
 ROXYON_TOKEN=roxp_xxx roxyon deploy --no-follow   # first run also creates the app
 ```
 
-From an AI assistant — add the MCP server to the client:
+### From an AI assistant
+
+**Local clients** (Claude Code, Cursor, Windsurf, Cline, Gemini CLI) — add the
+stdio server:
 
 ```json
 { "mcpServers": { "roxyon": { "command": "npx", "args": ["-y", "@roxyon/mcp"] } } }
 ```
 
-then the assistant calls `roxyon_init` and `roxyon_deploy`. See
-[`packages/mcp-server`](packages/mcp-server).
+then the assistant calls `roxyon_init` and `roxyon_deploy`.
+
+**Claude Code plugin** — bundles the server + `/roxyon-deploy` and `/roxyon-new`
+slash commands + a skill:
+
+```
+/plugin marketplace add bea-technology/roxyon-devtools
+/plugin install roxyon
+```
+
+**Remote connectors** (claude.ai, ChatGPT, Cursor URL) — connect to
+`https://mcp.roxyon.com/mcp` and sign in with your Roxyon account (OAuth, no
+token to paste). `roxyon_init` / `roxyon_deploy` are local-only there; use
+`roxyon_link_github` for push-to-deploy.
+
+**Add to Cursor:**
+
+[![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=roxyon&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkByb3h5b24vbWNwIl19)
+
+See [`packages/mcp-server`](packages/mcp-server) and
+[`integrations/mcp-clients.md`](integrations/mcp-clients.md).
 
 ## Develop
 
