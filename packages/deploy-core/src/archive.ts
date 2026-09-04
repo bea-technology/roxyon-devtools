@@ -1,5 +1,6 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import ignore, { type Ignore } from 'ignore';
 import { create as tarCreate } from 'tar';
 
@@ -103,6 +104,66 @@ export async function packDirectory(
   }
 
   return { buffer: Buffer.concat(chunks), files, bytes };
+}
+
+export interface FileEntry {
+  /** POSIX-style relative path inside the site, e.g. `index.html`, `about/index.html`. */
+  path: string;
+  /** File body — UTF-8 text, or base64 when `encoding: 'base64'`. */
+  content: string;
+  encoding?: 'utf8' | 'base64';
+}
+
+/** A path is safe if it is relative, has no `..`/`.` segment, and no NUL. */
+function safeEntryPath(p: string): string | null {
+  const norm = p.replace(/\\/g, '/').replace(/^\.\//, '');
+  if (!norm || norm.startsWith('/') || isAbsolute(norm) || norm.includes('\0')) return null;
+  if (norm.split('/').some((seg) => seg === '..' || seg === '.' || seg === '')) return null;
+  return norm;
+}
+
+/**
+ * Pack an in-memory list of `{ path, content }` into the same deterministic
+ * gzip tarball {@link packDirectory} produces — materialise to a temp dir, then
+ * reuse that path so the archive format and determinism are identical. Rejects
+ * absolute paths and `..` traversal; `maxBytes` caps the total *decoded* content.
+ */
+export async function packFiles(
+  entries: FileEntry[],
+  opts: { prefix?: string; maxBytes?: number } = {},
+): Promise<PackResult> {
+  if (entries.length === 0) throw new Error('No files to deploy.');
+
+  const seen = new Set<string>();
+  const clean: { path: string; buf: Buffer }[] = [];
+  let total = 0;
+  for (const e of entries) {
+    const rel = safeEntryPath(e.path);
+    if (!rel) throw new Error(`Unsafe file path: ${JSON.stringify(e.path)}`);
+    if (seen.has(rel)) throw new Error(`Duplicate file path: ${rel}`);
+    seen.add(rel);
+    const buf = Buffer.from(e.content, e.encoding === 'base64' ? 'base64' : 'utf8');
+    total += buf.length;
+    clean.push({ path: rel, buf });
+  }
+  const max = opts.maxBytes ?? 512 * 1024 * 1024;
+  if (total > max) {
+    throw new Error(
+      `Content is ${(total / 1024 / 1024).toFixed(1)} MB, which exceeds the ${(max / 1024 / 1024).toFixed(1)} MB limit.`,
+    );
+  }
+
+  const dir = await mkdtemp(join(tmpdir(), 'roxyon-content-'));
+  try {
+    for (const { path: rel, buf } of clean) {
+      const abs = join(dir, rel);
+      await mkdir(dirname(abs), { recursive: true });
+      await writeFile(abs, buf);
+    }
+    return await packDirectory(dir, opts);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 /** Total on-disk size of a set of files. */

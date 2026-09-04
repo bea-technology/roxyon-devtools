@@ -1,9 +1,11 @@
 export {
   ALWAYS_IGNORE,
   buildIgnore,
+  type FileEntry,
   listFiles,
   measure,
   packDirectory,
+  packFiles,
   type PackResult,
 } from './archive.js';
 export { type Detection, detectRuntime } from './detect.js';

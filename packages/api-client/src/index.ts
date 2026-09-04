@@ -21,9 +21,14 @@ export type {
   DeployResult,
 } from './applications.js';
 export { SitesApi } from './sites.js';
-export type { StaticDeployResult } from './sites.js';
+export type {
+  DeployOptions,
+  SiteFile,
+  SiteFileContent,
+  StaticDeployResult,
+} from './sites.js';
 export { DomainsApi } from './domains.js';
-export type { Domain } from './domains.js';
+export type { CreateDomainInput, CreateDomainResult, Domain } from './domains.js';
 export { SubscriptionsApi } from './subscriptions.js';
 export type { Subscription, Privilege } from './subscriptions.js';
 export { AccountApi } from './account.js';

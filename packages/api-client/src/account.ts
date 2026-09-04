@@ -12,6 +12,8 @@ export interface AccountDomain {
   id: string;
   name: string;
   subscription: string;
+  /** `active`, or `provisioning` while a freshly-added host comes up. */
+  status?: string;
 }
 
 export interface AccountContext {
@@ -74,6 +76,7 @@ export class AccountApi {
         id: d.id,
         name: d.name,
         subscription: d.subscription,
+        ...(d.status ? { status: d.status } : {}),
       })),
     };
   }

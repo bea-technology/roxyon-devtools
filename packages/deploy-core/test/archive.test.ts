@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buildIgnore, listFiles, packDirectory } from '../src/archive.js';
+import { buildIgnore, listFiles, packDirectory, packFiles } from '../src/archive.js';
 
 let dir: string;
 
@@ -54,5 +54,50 @@ describe('packDirectory', () => {
     await writeFile(join(empty, '.roxyonignore'), '*\n');
     await expect(packDirectory(empty)).rejects.toThrow(/Nothing to deploy/);
     await rm(empty, { recursive: true, force: true });
+  });
+});
+
+describe('packFiles', () => {
+  const site = [
+    { path: 'index.html', content: '<!doctype html><h1>hi</h1>' },
+    { path: 'about/index.html', content: '<!doctype html><h1>about</h1>' },
+    { path: 'assets/logo.png', content: 'iVBORw0KGgo=', encoding: 'base64' as const },
+  ];
+
+  it('packs an in-memory file list into a gzip tarball', async () => {
+    const { buffer, files, bytes } = await packFiles(site);
+    expect(files).toEqual(['about/index.html', 'assets/logo.png', 'index.html']);
+    expect(bytes).toBeGreaterThan(0);
+    expect(buffer[0]).toBe(0x1f);
+    expect(buffer[1]).toBe(0x8b);
+  });
+
+  it('is deterministic for identical input', async () => {
+    const a = await packFiles(site);
+    const b = await packFiles(site);
+    expect(Buffer.compare(a.buffer, b.buffer)).toBe(0);
+  });
+
+  it('rejects absolute paths and `..` traversal', async () => {
+    await expect(packFiles([{ path: '/etc/passwd', content: 'x' }])).rejects.toThrow(/Unsafe/);
+    await expect(packFiles([{ path: '../x', content: 'x' }])).rejects.toThrow(/Unsafe/);
+    await expect(packFiles([{ path: 'a/../../b', content: 'x' }])).rejects.toThrow(/Unsafe/);
+  });
+
+  it('rejects duplicates and empty input', async () => {
+    await expect(
+      packFiles([
+        { path: 'a.txt', content: '1' },
+        { path: './a.txt', content: '2' },
+      ]),
+    ).rejects.toThrow(/Duplicate/);
+    await expect(packFiles([])).rejects.toThrow(/No files/);
+  });
+
+  it('enforces the size cap', async () => {
+    const big = 'x'.repeat(200 * 1024);
+    await expect(
+      packFiles([{ path: 'big.txt', content: big }], { maxBytes: 1024 }),
+    ).rejects.toThrow(/exceeds/);
   });
 });
