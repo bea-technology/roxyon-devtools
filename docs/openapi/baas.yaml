@@ -662,6 +662,14 @@ paths:
           in: query
           schema: { type: string }
           description: Optional sub-path under the document root. Empty = site root.
+        - name: clean
+          in: query
+          schema: { type: string, enum: ["1"] }
+          description: Replace the whole document root (keeps `.well-known`).
+        - name: spa
+          in: query
+          schema: { type: string, enum: ["1"] }
+          description: Flip the host to single-page routing — unmatched paths serve `/index.html`.
       requestBody:
         required: true
         content:
@@ -680,3 +688,91 @@ paths:
                   path: { type: string }
                   files: { type: integer }
                   bytes: { type: integer }
+  /sites/files:
+    servers:
+      - url: https://console.roxyon.com
+    get:
+      operationId: listSiteFiles
+      summary: List files in a host's document root
+      security: [{ SessionToken: [] }, { Pat: [] }]
+      parameters:
+        - { name: host, in: query, required: true, schema: { type: string } }
+        - { name: folder, in: query, schema: { type: string } }
+        - { name: path, in: query, schema: { type: string }, description: List under this sub-path only. }
+      responses:
+        "200":
+          description: file list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        path: { type: string }
+                        size: { type: integer }
+                        type: { type: string, enum: [file, dir] }
+  /sites/file:
+    servers:
+      - url: https://console.roxyon.com
+    get:
+      operationId: readSiteFile
+      summary: Read one file from a host's document root
+      security: [{ SessionToken: [] }, { Pat: [] }]
+      parameters:
+        - { name: host, in: query, required: true, schema: { type: string } }
+        - { name: folder, in: query, schema: { type: string } }
+        - { name: path, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: file content
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  path: { type: string }
+                  size: { type: integer }
+                  encoding: { type: string, enum: [utf8, base64] }
+                  content: { type: string }
+  /domains/create:
+    servers:
+      - url: https://console.roxyon.com
+    post:
+      operationId: createDomain
+      summary: Provision a host (subdomain of an owned domain, or *.roxyon.com)
+      description: >
+        Writes the pending Domains row; the platform reconciler sets up DNS, the
+        web server and an automatic TLS certificate. Returns while it is still
+        coming up. Only subdomains of a domain the account already hosts (or
+        `roxyon.com`) are accepted.
+      security: [{ SessionToken: [] }, { Pat: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host]
+              properties:
+                host: { type: string, description: "e.g. promo.mycompany.com" }
+                subscription: { type: string, description: Omit if the account has one. }
+                siteType: { type: string, enum: [static, spa] }
+      responses:
+        "200":
+          description: created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  objectId: { type: string }
+                  host: { type: string }
+                  type: { type: string, enum: [subdomain, primary] }
+                  status: { type: string, enum: [provisioning, active, failed] }
