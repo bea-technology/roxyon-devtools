@@ -7,12 +7,18 @@ import {
   detectRuntime,
   listFiles,
   loadProjectConfig,
+  packFiles,
   saveProjectConfig,
 } from '@roxyon/deploy-core';
 import { z } from 'zod';
 import { currentContext } from './context.js';
 import { type ToolResult, errorResult, guard, text } from './result.js';
 import { type RoxyonSession, getSession } from './session.js';
+
+/** `roxyon_deploy_content` budget — keeps the whole JSON-RPC body under the 4 MB cap. */
+const MAX_FILES = 60;
+const MAX_FILE_BYTES = 1024 * 1024;
+const MAX_TOTAL_BYTES = 2 * 1024 * 1024;
 
 /**
  * `roxyon_init` / `roxyon_deploy` read and write the caller's local project
@@ -99,9 +105,13 @@ export function registerTools(server: McpServer): void {
         const { domains } = await accountContext(session);
         return text(
           domains.length
-            ? domains.map((d) => `- ${d.name}`).join('\n')
+            ? domains
+                .map(
+                  (d) => `- ${d.name}${d.status && d.status !== 'active' ? ` (${d.status})` : ''}`,
+                )
+                .join('\n')
             : '(no hosts on this account)',
-          { hosts: domains.map((d) => d.name) },
+          { hosts: domains },
         );
       }),
   );
@@ -488,6 +498,194 @@ export function registerTools(server: McpServer): void {
           webhookUrl: res.webhookUrl,
           secret: res.secret,
         });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_add_domain',
+    {
+      title: 'Roxyon: add a subdomain / host',
+      description:
+        'Provision a host — DNS + web server + automatic HTTPS. The host must be a subdomain ' +
+        'of a domain the account already hosts (or a *.roxyon.com subdomain). Returns while it ' +
+        'is still coming up; TLS follows a minute or two later. Needs confirm:true.',
+      inputSchema: {
+        host: z.string().describe('The full hostname, e.g. promo.mycompany.com'),
+        subscription: z
+          .string()
+          .optional()
+          .describe('Which subscription to attach it to (omit if the account has one).'),
+        spa: z.boolean().optional().describe('Single-page app: unmatched paths serve /index.html.'),
+        confirm: z.boolean().optional(),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        if (!args.confirm) {
+          return text(
+            `Would provision ${args.host}${args.spa ? ' (SPA routing)' : ''}. Pass confirm:true.`,
+            { dryRun: true },
+          );
+        }
+        const res = await session.roxyon.domains.create({
+          host: args.host,
+          subscription: args.subscription ?? session.preferredSubscription,
+          siteType: args.spa ? 'spa' : undefined,
+        });
+        const live = res.status === 'active';
+        return text(
+          [
+            `${res.host} — ${res.type}, ${res.status}.`,
+            live
+              ? 'The host is up. HTTPS may take another minute to issue.'
+              : 'DNS + web server are being set up (~1–2 min), then HTTPS. ' +
+                'Check roxyon_list_domains, or just deploy now — files are kept and served once it is live.',
+          ].join('\n'),
+          { ok: true, host: res.host, type: res.type, status: res.status },
+        );
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_deploy_content',
+    {
+      title: 'Roxyon: deploy generated files',
+      description: [
+        'Publish a set of files you generated (HTML/CSS/JS/assets) to a host on the account.',
+        'The host must already exist (roxyon_add_domain, or an existing site). Overlay by',
+        'default — pass clean:true to replace the whole document root. Needs confirm:true.',
+        `Limits: ${MAX_FILES} files, ${(MAX_FILE_BYTES / 1024) | 0} KB per file,`,
+        `${(MAX_TOTAL_BYTES / 1024 / 1024).toFixed(1)} MB total (base64-encode binaries).`,
+      ].join(' '),
+      inputSchema: {
+        host: z.string().describe('Target host, e.g. promo.mycompany.com'),
+        folder: z.string().optional().describe('Sub-path under the host; "" = site root.'),
+        files: z
+          .array(
+            z.object({
+              path: z.string().describe('Relative path, e.g. index.html, about/index.html'),
+              content: z.string(),
+              encoding: z.enum(['utf8', 'base64']).optional(),
+            }),
+          )
+          .min(1),
+        clean: z.boolean().optional().describe('Replace the whole docroot (keeps .well-known).'),
+        spa: z.boolean().optional().describe('Also flip the host to SPA routing.'),
+        confirm: z.boolean().optional(),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        if (args.files.length > MAX_FILES) {
+          return errorResult(`Too many files (${args.files.length}); the limit is ${MAX_FILES}.`);
+        }
+        let total = 0;
+        for (const f of args.files) {
+          const n = Buffer.byteLength(f.content, f.encoding === 'base64' ? 'base64' : 'utf8');
+          if (n > MAX_FILE_BYTES) {
+            return errorResult(
+              `"${f.path}" is ${(n / 1024) | 0} KB; the per-file limit is ${(MAX_FILE_BYTES / 1024) | 0} KB.`,
+            );
+          }
+          total += n;
+        }
+        if (total > MAX_TOTAL_BYTES) {
+          return errorResult(
+            `Total content is ${(total / 1024 / 1024).toFixed(1)} MB; the limit is ` +
+              `${(MAX_TOTAL_BYTES / 1024 / 1024).toFixed(1)} MB. Deploy in parts or use the CLI.`,
+          );
+        }
+
+        const folder = args.folder ?? '';
+        if (!args.confirm) {
+          return text(
+            [
+              'DRY RUN — pass confirm:true to deploy.',
+              '',
+              `Host:   ${args.host}${folder ? `/${folder}` : ''}`,
+              `Files:  ${args.files.length} (${(total / 1024) | 0} KB)`,
+              `Mode:   ${args.clean ? 'clean (replaces the document root)' : 'overlay'}${args.spa ? ' + SPA routing' : ''}`,
+              ...args.files.slice(0, 20).map((f) => `  ${f.path}`),
+              args.files.length > 20 ? `  … ${args.files.length - 20} more` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            { dryRun: true },
+          );
+        }
+
+        const { buffer, files } = await packFiles(args.files, { maxBytes: MAX_TOTAL_BYTES });
+        const r = await session.roxyon.sites.deploy(args.host, folder, buffer, {
+          clean: args.clean,
+          spa: args.spa,
+        });
+        const size = r.bytes ? ` (${(r.bytes / 1024) | 0} KB)` : '';
+        const spaNote = args.spa ? '\nSPA routing enabled — deep links resolve to index.html.' : '';
+        return text(
+          `✓ Deployed ${files.length} file(s) to https://${args.host}${folder ? `/${folder}` : ''}${size}.${spaNote}`,
+          { ok: true, host: args.host, files: files.length },
+        );
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_list_files',
+    {
+      title: 'Roxyon: list a site’s files',
+      description: "The files currently deployed to a host's document root.",
+      inputSchema: {
+        host: z.string(),
+        folder: z.string().optional(),
+        path: z.string().optional().describe('List under this sub-path only.'),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        const files = await session.roxyon.sites.listFiles(
+          args.host,
+          args.folder ?? '',
+          args.path ?? '',
+        );
+        const body = files.length
+          ? files
+              .map(
+                (f) => `${f.type === 'dir' ? 'd' : '-'} ${String(f.size).padStart(8)}  ${f.path}`,
+              )
+              .join('\n')
+          : '(empty)';
+        return text(body, { files });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_read_file',
+    {
+      title: 'Roxyon: read a site file',
+      description: "Read one file from a host's document root (to review or edit it).",
+      inputSchema: {
+        host: z.string(),
+        folder: z.string().optional(),
+        path: z.string().describe('Relative path, e.g. index.html'),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        const f = await session.roxyon.sites.readFile(args.host, args.folder ?? '', args.path);
+        if (f.encoding === 'base64') {
+          return text(
+            `${f.path} — ${f.size} bytes, binary (base64):\n\n${f.content.slice(0, 4096)}`,
+            { path: f.path, size: f.size, encoding: 'base64' },
+          );
+        }
+        return text(f.content, { path: f.path, size: f.size, encoding: 'utf8' });
       }),
   );
 }
