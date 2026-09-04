@@ -18,15 +18,19 @@ describe('roxyon mcp server', () => {
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual(
       [
+        'roxyon_add_domain',
         'roxyon_app_status',
         'roxyon_deploy',
+        'roxyon_deploy_content',
         'roxyon_env_get',
         'roxyon_env_set',
         'roxyon_init',
         'roxyon_link_github',
         'roxyon_list_apps',
         'roxyon_list_domains',
+        'roxyon_list_files',
         'roxyon_logs',
+        'roxyon_read_file',
         'roxyon_restart',
         'roxyon_whoami',
       ].sort(),
@@ -44,7 +48,12 @@ describe('roxyon mcp server', () => {
   it('serves the doc resources', async () => {
     const { resources } = await client.listResources();
     const uris = resources.map((r) => r.uri).sort();
-    expect(uris).toEqual(['roxyon://docs/baas', 'roxyon://docs/deploy', 'roxyon://docs/lumenjs']);
+    expect(uris).toEqual([
+      'roxyon://docs/baas',
+      'roxyon://docs/deploy',
+      'roxyon://docs/lumenjs',
+      'roxyon://docs/recipe',
+    ]);
 
     const doc = await client.readResource({ uri: 'roxyon://docs/deploy' });
     expect(String(doc.contents[0]?.text)).toContain('roxyon.json');
@@ -52,7 +61,11 @@ describe('roxyon mcp server', () => {
 
   it('exposes the prompts', async () => {
     const { prompts } = await client.listPrompts();
-    expect(prompts.map((p) => p.name).sort()).toEqual(['deploy-to-roxyon', 'scaffold-lumen-app']);
+    expect(prompts.map((p) => p.name).sort()).toEqual([
+      'build-and-ship-site',
+      'deploy-to-roxyon',
+      'scaffold-lumen-app',
+    ]);
   });
 
   it('returns a clean error (not a crash) when unauthenticated', async () => {

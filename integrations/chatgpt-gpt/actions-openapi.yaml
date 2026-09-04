@@ -4,9 +4,10 @@ info:
   version: "1.0.0"
   description: >
     A subset of the Roxyon API for a ChatGPT Custom GPT: BaaS data operations,
-    application status/logs, and the account context. Binary source uploads
-    (`roxyon deploy`) are not exposed here — those need the `@roxyon/cli` or the
-    MCP server. Auth is a Personal Access Token: create one with
+    application status/logs, the account context, host provisioning and static
+    file listing/reading. Binary source uploads (`/sites/deploy`,
+    `/applications/deploy`) are not exposed here — those need the `@roxyon/cli`
+    or the MCP server. Auth is a Personal Access Token: create one with
     `roxyon token create` and paste it as the API key (Bearer).
 servers:
   - url: https://console.roxyon.com
@@ -62,3 +63,43 @@ paths:
                 action: { type: string, enum: [deploy, restart] }
       responses:
         "200": { description: queued }
+  /domains/create:
+    post:
+      operationId: createDomain
+      summary: >
+        Provision a host — a subdomain of a domain the account already hosts
+        (or *.roxyon.com). DNS + web server + automatic HTTPS. Returns while it
+        is still coming up.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host]
+              properties:
+                host: { type: string, description: "e.g. promo.mycompany.com" }
+                subscription: { type: string }
+                siteType: { type: string, enum: [static, spa] }
+      responses:
+        "200": { description: "{ objectId, host, type, status }" }
+  /sites/files:
+    get:
+      operationId: listSiteFiles
+      summary: List the files currently deployed to a host's document root
+      parameters:
+        - { name: host, in: query, required: true, schema: { type: string } }
+        - { name: folder, in: query, schema: { type: string } }
+        - { name: path, in: query, schema: { type: string } }
+      responses:
+        "200": { description: "{ files: [{ path, size, type }] }" }
+  /sites/file:
+    get:
+      operationId: readSiteFile
+      summary: Read one file from a host's document root
+      parameters:
+        - { name: host, in: query, required: true, schema: { type: string } }
+        - { name: folder, in: query, schema: { type: string } }
+        - { name: path, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{ path, size, encoding, content }" }

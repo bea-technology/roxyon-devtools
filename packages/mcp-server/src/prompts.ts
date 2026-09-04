@@ -27,6 +27,31 @@ export function registerPrompts(server: McpServer): void {
   );
 
   server.registerPrompt(
+    'build-and-ship-site',
+    {
+      title: 'Build a site and host it on Roxyon',
+      description:
+        'Generate a static site (or no-build LumenJS SPA) in the conversation and publish it to ' +
+        'a Roxyon host — for the hosted connector, no local files.',
+      argsSchema: {
+        brief: z.string().describe('What the site should be.'),
+        host: z.string().describe('Where to host it, e.g. promo.mycompany.com'),
+      },
+    },
+    ({ brief, host }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `Build and publish a website to ${host}.\n\nBrief: ${brief}\n\n1. Read "roxyon://docs/recipe" and follow it. (Read "roxyon://docs/lumenjs" too only if the site needs reactivity.)\n2. If ${host} is not already on the account, roxyon_add_domain { host: "${host}", confirm: true } (add spa:true only for a real single-page app).\n3. Generate the site — self-contained static files, relative paths, real .html per page or <page>/index.html, ≤60 files / 2 MB.\n4. roxyon_deploy_content { host: "${host}", files: [...], clean: true, confirm: true } (dry-run first).\n5. roxyon_list_files { host: "${host}" } to verify, then give me the URL. Note that HTTPS may take a couple of minutes on a brand-new host.`,
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
     'deploy-to-roxyon',
     {
       title: 'Deploy this project to Roxyon',

@@ -41,6 +41,15 @@ const DOCS: Doc[] = [
       'How roxyon_init / roxyon_deploy work, the roxyon.json schema, static vs app deploys, env ' +
       'vars, and git push-to-deploy.',
   },
+  {
+    uri: 'roxyon://docs/recipe',
+    name: 'web-deploy-recipe',
+    file: 'recipe-web-deploy.md',
+    title: 'Recipe — build a site and host it',
+    description:
+      'The end-to-end flow for "build a landing page and put it on sub.mydomain.com" over the ' +
+      'hosted connector: roxyon_add_domain → roxyon_deploy_content → roxyon_list_files.',
+  },
 ];
 
 export function registerResources(server: McpServer): void {
