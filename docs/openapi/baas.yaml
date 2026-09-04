@@ -579,9 +579,6 @@ paths:
                         id: { type: string }
                         name: { type: string }
                         status: { type: string }
-                        node: { type: string }
-                        datacenter: { type: string }
-                        container: { type: string }
                   domains:
                     type: array
                     items:

@@ -71,10 +71,7 @@ export function registerTools(server: McpServer): void {
           `Auth: ${session.source}${ctx.scopes.length ? ` (scopes: ${ctx.scopes.join(', ')})` : ''}`,
           '',
           'Subscriptions:',
-          ...ctx.subscriptions.map(
-            (s) =>
-              `  ${s.name || s.id} — ${s.status || '?'}${s.datacenter ? ` · ${s.datacenter}` : ''}`,
-          ),
+          ...ctx.subscriptions.map((s) => `  ${s.name || s.id} — ${s.status || '?'}`),
           '',
           `Hosts: ${ctx.domains.map((d) => d.name).join(', ') || '(none)'}`,
         ];

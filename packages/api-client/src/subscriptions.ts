@@ -5,10 +5,6 @@ export interface Subscription {
   objectId: string;
   Name?: string;
   Status?: string;
-  Username?: string;
-  /** Infra node the subscription's container lives on (internal). */
-  Node?: string;
-  Datacenter?: string;
   [k: string]: unknown;
 }
 
@@ -39,7 +35,7 @@ export class SubscriptionsApi {
         {
           className: 'Subscriptions',
           field: 'Subscription',
-          fields: 'objectId,Name,Status,Username,Node,Datacenter',
+          fields: 'objectId,Name,Status',
         },
       ],
     });

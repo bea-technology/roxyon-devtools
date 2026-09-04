@@ -6,9 +6,6 @@ export interface AccountSubscription {
   id: string;
   name: string;
   status: string;
-  node: string;
-  datacenter: string;
-  container: string;
 }
 
 export interface AccountDomain {
@@ -33,15 +30,15 @@ export interface AccountApp {
   configRevision: number;
   appliedRevision: number;
   lastError: string | null;
-  sourcePath: string;
   repo: { url: string; branch: string } | null;
 }
 
 /**
  * `GET /account/context` — one call the CLI / MCP server use to plan a deploy:
- * the signed-in user, their subscriptions (with node), and their domains.
- * Resolvable by a session token OR a Personal Access Token, so a CI job with
- * only a PAT never has to touch the BaaS.
+ * the signed-in user, their subscriptions, and their domains. Resolvable by a
+ * session token OR a Personal Access Token, so a CI job with only a PAT never
+ * has to touch the BaaS. Infra details (nodes, datacenters, container names,
+ * filesystem paths) are deliberately not surfaced here.
  */
 export class AccountApi {
   private cache?: Promise<AccountContext>;
@@ -62,11 +59,22 @@ export class AccountApi {
     if (!r?.ok || !r.user?.id) {
       throw new RoxyonApiError(r?.error || 'Could not load the account context.', { body: r });
     }
+    // Map explicitly — the endpoint may carry infra fields (node/datacenter/
+    // container); keep only what a deploy actually needs so they never reach
+    // an AI assistant's context or a log.
     return {
-      user: r.user,
+      user: { id: r.user.id, email: r.user.email },
       scopes: r.scopes ?? [],
-      subscriptions: r.subscriptions ?? [],
-      domains: r.domains ?? [],
+      subscriptions: (r.subscriptions ?? []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        status: s.status,
+      })),
+      domains: (r.domains ?? []).map((d) => ({
+        id: d.id,
+        name: d.name,
+        subscription: d.subscription,
+      })),
     };
   }
 
@@ -78,7 +86,17 @@ export class AccountApi {
       error?: string;
     }>('GET', '/account/apps', { tolerateHttpError: true });
     if (!r?.ok) throw new RoxyonApiError(r?.error || 'Could not list applications.', { body: r });
-    return r.applications ?? [];
+    return (r.applications ?? []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      status: a.status,
+      desiredState: a.desiredState,
+      runtime: a.runtime,
+      configRevision: a.configRevision,
+      appliedRevision: a.appliedRevision,
+      lastError: a.lastError,
+      repo: a.repo,
+    }));
   }
 
   /** One application by id, PAT-safe (filters {@link apps}). */

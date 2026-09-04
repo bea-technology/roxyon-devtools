@@ -25,10 +25,7 @@ export async function whoami(): Promise<void> {
         ctx.subscriptions[0];
       for (const s of ctx.subscriptions) {
         const mark = s.id === active?.id ? '→ ' : '  ';
-        ui.kv(
-          `${mark}${s.name || s.id}`,
-          `${s.status || '?'}${s.datacenter ? ` · ${s.datacenter}` : ''}`,
-        );
+        ui.kv(`${mark}${s.name || s.id}`, s.status || '?');
       }
     }
     ui.kv('Hosts', ctx.domains.map((d) => d.name).join(', ') || '(none)');
