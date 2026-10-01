@@ -1,5 +1,13 @@
 # @roxyon/cli
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [d6c111a]
+  - @roxyon/api-client@0.3.0
+  - @roxyon/deploy-core@0.3.0
+
 ## 0.1.2
 
 ### Patch Changes
