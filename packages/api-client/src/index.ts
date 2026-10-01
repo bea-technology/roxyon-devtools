@@ -2,8 +2,11 @@ import { AccountApi } from './account.js';
 import { ApplicationsApi } from './applications.js';
 import { AuthApi } from './auth.js';
 import { RoxyonClient, type RoxyonClientOptions } from './client.js';
+import { DatabasesApi } from './databases.js';
 import { DomainsApi } from './domains.js';
+import { EmailApi } from './email.js';
 import { SitesApi } from './sites.js';
+import { SshApi } from './ssh.js';
 import { SubscriptionsApi } from './subscriptions.js';
 import { TokensApi } from './tokens.js';
 
@@ -29,6 +32,22 @@ export type {
 } from './sites.js';
 export { DomainsApi } from './domains.js';
 export type { CreateDomainInput, CreateDomainResult, Domain } from './domains.js';
+export { DatabasesApi } from './databases.js';
+export type {
+  CreateDatabaseInput,
+  CreateDatabaseResult,
+  DatabaseSummary,
+  DeleteDatabaseResult,
+} from './databases.js';
+export { EmailApi } from './email.js';
+export type {
+  CreateEmailInput,
+  CreateEmailResult,
+  EmailSummary,
+  DeleteEmailResult,
+} from './email.js';
+export { SshApi } from './ssh.js';
+export type { ResetSshPasswordInput, ResetSshPasswordResult } from './ssh.js';
 export { SubscriptionsApi } from './subscriptions.js';
 export type { Subscription, Privilege } from './subscriptions.js';
 export { AccountApi } from './account.js';
@@ -64,6 +83,9 @@ export class Roxyon {
   readonly domains: DomainsApi;
   readonly applications: ApplicationsApi;
   readonly sites: SitesApi;
+  readonly databases: DatabasesApi;
+  readonly email: EmailApi;
+  readonly ssh: SshApi;
 
   constructor(options: RoxyonClientOptions | RoxyonClient = {}) {
     this.client = options instanceof RoxyonClient ? options : new RoxyonClient(options);
@@ -74,6 +96,9 @@ export class Roxyon {
     this.domains = new DomainsApi(this.client);
     this.applications = new ApplicationsApi(this.client);
     this.sites = new SitesApi(this.client);
+    this.databases = new DatabasesApi(this.client);
+    this.email = new EmailApi(this.client);
+    this.ssh = new SshApi(this.client);
   }
 
   get sessionToken(): string | undefined {

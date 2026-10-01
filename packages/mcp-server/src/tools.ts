@@ -1,3 +1,6 @@
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { type Roxyon, envFromStored, formatEnv } from '@roxyon/api-client';
 import {
@@ -5,8 +8,10 @@ import {
   buildProjectConfig,
   deployProject,
   detectRuntime,
+  installWordPress,
   listFiles,
   loadProjectConfig,
+  packDirectory,
   packFiles,
   saveProjectConfig,
 } from '@roxyon/deploy-core';
@@ -25,7 +30,9 @@ const MAX_TOTAL_BYTES = 2 * 1024 * 1024;
  * directory — impossible over the remote HTTP server. Returns an explanatory
  * result when running in that mode, `null` otherwise (proceed).
  */
-function remoteFilesystemBlock(tool: 'roxyon_init' | 'roxyon_deploy'): ToolResult | null {
+function remoteFilesystemBlock(
+  tool: 'roxyon_init' | 'roxyon_deploy' | 'roxyon_install_wordpress',
+): ToolResult | null {
   if (!currentContext().remote) return null;
   return errorResult(
     [
@@ -517,6 +524,12 @@ export function registerTools(server: McpServer): void {
           .optional()
           .describe('Which subscription to attach it to (omit if the account has one).'),
         spa: z.boolean().optional().describe('Single-page app: unmatched paths serve /index.html.'),
+        phpVersion: z
+          .string()
+          .optional()
+          .describe(
+            'PHP version for the vhost, e.g. "8.3" (needed to run PHP apps like WordPress).',
+          ),
         confirm: z.boolean().optional(),
       },
     },
@@ -533,6 +546,7 @@ export function registerTools(server: McpServer): void {
           host: args.host,
           subscription: args.subscription ?? session.preferredSubscription,
           siteType: args.spa ? 'spa' : undefined,
+          phpVersion: args.phpVersion,
         });
         const live = res.status === 'active';
         return text(
@@ -686,6 +700,314 @@ export function registerTools(server: McpServer): void {
           );
         }
         return text(f.content, { path: f.path, size: f.size, encoding: 'utf8' });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_database_create',
+    {
+      title: 'Roxyon: create a database',
+      description:
+        "Provision a MySQL/MariaDB database + user. The name is prefixed with the account's own " +
+        'username (globally unique across the shared cluster) — pass just the suffix, e.g. "wordpress". ' +
+        'The password is shown once in the result; there is no way to retrieve it later. Needs confirm:true.',
+      inputSchema: {
+        name: z.string().describe('DB name suffix: lowercase letters, digits, underscore.'),
+        subscription: z.string().optional(),
+        password: z.string().optional().describe('Omit to have Roxyon generate one.'),
+        confirm: z.boolean().optional(),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        if (!args.confirm) {
+          return text(`Would create database "${args.name}". Pass confirm:true.`, { dryRun: true });
+        }
+        const r = await session.roxyon.databases.create({
+          name: args.name,
+          subscription: args.subscription ?? session.preferredSubscription,
+          password: args.password,
+        });
+        const body = [
+          `${r.status === 'active' ? '✓' : '»'} Database ${r.name} (user ${r.username}) — ${r.status}.`,
+          r.password ? `\nPassword (save this now — shown once):\n${r.password}` : '',
+          r.host ? `Host: ${r.host}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n');
+        return text(body, {
+          ok: true,
+          objectId: r.objectId,
+          name: r.name,
+          username: r.username,
+          host: r.host,
+          status: r.status,
+        });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_list_databases',
+    {
+      title: 'Roxyon: list databases',
+      description: 'Databases on the active subscription.',
+      inputSchema: { subscription: z.string().optional() },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        const subscription = args.subscription ?? session.preferredSubscription;
+        if (!subscription) return errorResult('No subscription — pass "subscription".');
+        const rows = await session.roxyon.databases.list(subscription);
+        const body = rows.length
+          ? rows
+              .map((d) => `- ${d.Name} [${d.objectId}] — ${d.Status} (user ${d.Username})`)
+              .join('\n')
+          : '(no databases)';
+        return text(body, { databases: rows });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_database_delete',
+    {
+      title: 'Roxyon: delete a database',
+      description:
+        'Delete a database by its objectId (from roxyon_database_create/roxyon_list_databases). Needs confirm:true.',
+      inputSchema: { database: z.string(), confirm: z.boolean().optional() },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        if (!args.confirm) {
+          return text(`Would delete database ${args.database}. Pass confirm:true.`, {
+            dryRun: true,
+          });
+        }
+        const r = await session.roxyon.databases.delete(args.database);
+        return text(`Database ${args.database} — ${r.status}.`, { ok: true, status: r.status });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_email_create',
+    {
+      title: 'Roxyon: create a mailbox',
+      description:
+        'Provision a mailbox on a host already on the account. The password is shown once in the ' +
+        'result; there is no way to retrieve it later. Needs confirm:true.',
+      inputSchema: {
+        localPart: z.string().describe('The part before @, e.g. "info".'),
+        domain: z.string().describe('A hostname already on the account.'),
+        password: z.string().optional().describe('Omit to have Roxyon generate one.'),
+        quota: z.number().int().positive().optional().describe('Quota in MB (default 1024).'),
+        forwardTo: z.string().optional(),
+        saveCopy: z.boolean().optional(),
+        confirm: z.boolean().optional(),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        const email = `${args.localPart}@${args.domain}`;
+        if (!args.confirm) {
+          return text(`Would create mailbox ${email}. Pass confirm:true.`, { dryRun: true });
+        }
+        const r = await session.roxyon.email.create({
+          localPart: args.localPart,
+          domain: args.domain,
+          password: args.password,
+          quota: args.quota,
+          forwardTo: args.forwardTo,
+          saveCopy: args.saveCopy,
+        });
+        const body = [
+          `${r.status === 'active' ? '✓' : '»'} Mailbox ${r.email} — ${r.status}.`,
+          r.password ? `\nPassword (save this now — shown once):\n${r.password}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n');
+        return text(body, { ok: true, objectId: r.objectId, email: r.email, status: r.status });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_list_emails',
+    {
+      title: 'Roxyon: list mailboxes',
+      description: 'Mailboxes on the active subscription.',
+      inputSchema: { subscription: z.string().optional() },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        const subscription = args.subscription ?? session.preferredSubscription;
+        if (!subscription) return errorResult('No subscription — pass "subscription".');
+        const rows = await session.roxyon.email.list(subscription);
+        const body = rows.length
+          ? rows.map((e) => `- ${e.Email} [${e.objectId}] — ${e.Status}`).join('\n')
+          : '(no mailboxes)';
+        return text(body, { emails: rows });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_email_delete',
+    {
+      title: 'Roxyon: delete a mailbox',
+      description:
+        'Delete a mailbox by its objectId (from roxyon_email_create/roxyon_list_emails). Needs confirm:true.',
+      inputSchema: { email: z.string(), confirm: z.boolean().optional() },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        if (!args.confirm) {
+          return text(`Would delete mailbox ${args.email}. Pass confirm:true.`, { dryRun: true });
+        }
+        const r = await session.roxyon.email.delete(args.email);
+        return text(`Mailbox ${args.email} — ${r.status}.`, { ok: true, status: r.status });
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_ssh_reset_password',
+    {
+      title: 'Roxyon: reset the SSH/SFTP password',
+      description:
+        "Reset a subscription's shell password — used for SSH, SFTP, and the file manager. Changing " +
+        'it signs out anything using the old one. The password is shown once in the result; the ' +
+        'platform never stores or re-shows it. Needs confirm:true.',
+      inputSchema: {
+        subscription: z.string().optional(),
+        password: z
+          .string()
+          .optional()
+          .describe('Omit to have Roxyon generate one (12+ chars, mixed case, number, symbol).'),
+        confirm: z.boolean().optional(),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        if (!args.confirm) {
+          return text('Would reset the SSH/SFTP password. Pass confirm:true.', { dryRun: true });
+        }
+        const r = await session.roxyon.ssh.resetPassword({
+          subscription: args.subscription ?? session.preferredSubscription,
+          password: args.password,
+        });
+        return text(
+          `${r.status === 'active' ? '✓' : '»'} SSH/SFTP password ${r.status === 'active' ? 'changed' : 'change queued'}.\n\n` +
+            `Password (save this now — shown once):\n${r.password}`,
+          { ok: true, subscription: r.subscription, status: r.status },
+        );
+      }),
+  );
+
+  // -----------------------------------------------------------------------
+  server.registerTool(
+    'roxyon_install_wordpress',
+    {
+      title: 'Roxyon: install WordPress',
+      description: [
+        'One-shot recipe: create a subdomain (if it does not already exist), provision a database',
+        'for it, download WordPress core, and deploy it. v1 scope — core only, no plugin/theme',
+        'selection, single site. Local-only (needs your filesystem to unpack WordPress into) — run',
+        'this from the CLI-backed MCP, not the hosted mcp.roxyon.com connector. Needs confirm:true.',
+      ].join(' '),
+      inputSchema: {
+        host: z
+          .string()
+          .describe('The site host, e.g. blog.mycompany.com — created if it does not exist.'),
+        folder: z
+          .string()
+          .optional()
+          .describe('Sub-path under the host; "" = site root (recommended).'),
+        subscription: z.string().optional(),
+        dbName: z
+          .string()
+          .optional()
+          .describe(
+            'Database name suffix (default derived from the host). See roxyon_database_create.',
+          ),
+        phpVersion: z.string().optional().describe('Default "8.3".'),
+        confirm: z.boolean().optional(),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const blocked = remoteFilesystemBlock('roxyon_install_wordpress');
+        if (blocked) return blocked;
+        const session = await getSession();
+        const folder = args.folder ?? '';
+        const dbSuffix =
+          (args.dbName ?? args.host.split('.')[0] ?? 'wordpress')
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, '_')
+            .replace(/^[^a-z]+/, '')
+            .slice(0, 20) || 'wordpress';
+
+        if (!args.confirm) {
+          return text(
+            [
+              'DRY RUN — pass confirm:true to install.',
+              '',
+              `Host:     ${args.host}${folder ? `/${folder}` : ''} (created if missing)`,
+              `Database: ${dbSuffix} (prefixed with your account username)`,
+              'Steps:    add domain -> create database -> download WordPress core -> upload',
+            ].join('\n'),
+            { dryRun: true },
+          );
+        }
+
+        const subscription = args.subscription ?? session.preferredSubscription;
+
+        const domain = await session.roxyon.domains.create({
+          host: args.host,
+          subscription,
+          phpVersion: args.phpVersion ?? '8.3',
+        });
+        if (domain.status === 'failed') {
+          return errorResult(
+            `Could not provision ${args.host}: ${domain.error ?? 'unknown error'}`,
+          );
+        }
+
+        const db = await session.roxyon.databases.create({ name: dbSuffix, subscription });
+        if (db.status === 'failed' || !db.password || !db.host) {
+          return errorResult(`Could not provision the database: ${db.error ?? 'unknown error'}`);
+        }
+
+        const scratchDir = await mkdtemp(join(tmpdir(), 'roxyon-wp-'));
+        await installWordPress({
+          dir: scratchDir,
+          db: { name: db.name, username: db.username, password: db.password, host: db.host },
+        });
+
+        const pack = await packDirectory(scratchDir);
+        const deployRes = await session.roxyon.sites.deploy(args.host, folder, pack.buffer);
+
+        const url = `https://${deployRes.host}${deployRes.path && deployRes.path !== '/' ? deployRes.path : ''}`;
+        return text(
+          [
+            `✓ WordPress installed at ${url} (${pack.files.length} files).`,
+            'Visit the site to finish setup (site title, admin account) — WordPress asks for these',
+            'on first load.',
+            '',
+            `Database: ${db.name} / ${db.username} — password shown once, save it now:`,
+            db.password,
+          ].join('\n'),
+          { ok: true, url, database: { name: db.name, username: db.username } },
+        );
       }),
   );
 }

@@ -28,6 +28,13 @@ export {
 } from './deploy.js';
 export { runShellCommand } from './run-command.js';
 export {
+  buildWpConfig,
+  installWordPress,
+  type InstallWordPressOptions,
+  type InstallWordPressResult,
+  type WordPressDbCredentials,
+} from './wordpress.js';
+export {
   type Credentials,
   credentialsDir,
   credentialsPath,

@@ -13,6 +13,8 @@ export interface CreateDomainInput {
   subscription?: string;
   /** `spa` → unmatched paths serve `/index.html`; default `static`. */
   siteType?: 'static' | 'spa';
+  /** PHP version for the vhost (e.g. `"8.3"`). Unknown/omitted falls back to the platform default. */
+  phpVersion?: string;
 }
 
 export interface CreateDomainResult {

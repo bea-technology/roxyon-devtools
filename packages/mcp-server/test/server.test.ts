@@ -20,18 +20,26 @@ describe('roxyon mcp server', () => {
       [
         'roxyon_add_domain',
         'roxyon_app_status',
+        'roxyon_database_create',
+        'roxyon_database_delete',
         'roxyon_deploy',
         'roxyon_deploy_content',
+        'roxyon_email_create',
+        'roxyon_email_delete',
         'roxyon_env_get',
         'roxyon_env_set',
         'roxyon_init',
+        'roxyon_install_wordpress',
         'roxyon_link_github',
         'roxyon_list_apps',
+        'roxyon_list_databases',
         'roxyon_list_domains',
+        'roxyon_list_emails',
         'roxyon_list_files',
         'roxyon_logs',
         'roxyon_read_file',
         'roxyon_restart',
+        'roxyon_ssh_reset_password',
         'roxyon_whoami',
       ].sort(),
     );
@@ -53,6 +61,7 @@ describe('roxyon mcp server', () => {
       'roxyon://docs/deploy',
       'roxyon://docs/lumenjs',
       'roxyon://docs/recipe',
+      'roxyon://docs/recipe-wordpress',
     ]);
 
     const doc = await client.readResource({ uri: 'roxyon://docs/deploy' });
@@ -64,6 +73,7 @@ describe('roxyon mcp server', () => {
     expect(prompts.map((p) => p.name).sort()).toEqual([
       'build-and-ship-site',
       'deploy-to-roxyon',
+      'install-wordpress',
       'scaffold-lumen-app',
     ]);
   });

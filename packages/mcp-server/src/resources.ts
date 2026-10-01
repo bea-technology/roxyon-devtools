@@ -50,6 +50,15 @@ const DOCS: Doc[] = [
       'The end-to-end flow for "build a landing page and put it on sub.mydomain.com" over the ' +
       'hosted connector: roxyon_add_domain → roxyon_deploy_content → roxyon_list_files.',
   },
+  {
+    uri: 'roxyon://docs/recipe-wordpress',
+    name: 'wordpress-recipe',
+    file: 'recipe-wordpress.md',
+    title: 'Recipe — install WordPress',
+    description:
+      'The end-to-end flow for "put WordPress on sub.mydomain.com": roxyon_install_wordpress ' +
+      '(host + database + WordPress core, one call). Local/CLI-backed MCP only.',
+  },
 ];
 
 export function registerResources(server: McpServer): void {

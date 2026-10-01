@@ -3,24 +3,26 @@
 > LumenJS is a tiny, no-build, no-virtual-DOM reactive framework for building
 > single-page apps with standard HTML, CSS and JavaScript. `.view` files are
 > plain HTML+JS+CSS fetched and interpreted in the browser — there is no
-> compilation step for the framework. It pairs with MobiusCSS for layout
-> utilities and the Roxyon BaaS for the backend.
+> compilation step for your own code. It pairs with MobiusCSS for layout
+> utilities and the Roxyon BaaS for the backend. Current major version: V2.
 
 ## Read first
 
-- [Complete LumenJS V1 reference](https://lumenjs.com/llms/lumenjs.md): the whole framework, contrasted with Vue/React. Read before writing any `.view` file.
-- [Roxyon BaaS reference](https://roxyon.com/llms/baas.md): the data/auth backend LumenJS apps use.
+- [Complete LumenJS V2 reference](https://lumenjs.com/llms/lumenjs.md): the whole framework, contrasted with Vue/React. Read before writing any `.view` file. (A V1 reference also exists at the same host for legacy projects — do not mix V1 idioms, especially `bind=`, into V2 code.)
+- [Roxyon BaaS reference](https://roxyon.com/llms/baas.md): the data/auth backend LumenJS apps use — unchanged between V1 and V2.
 
-## The rules that bite (V1)
+## The rules that bite (V2)
 
-- State is `var` (never `let`/`const`) in a `<script>` inside the view; it becomes reactive only when named in `bind="name"` on an ancestor element.
-- A `bind` inside another `bind` silently stops the inner subtree from rendering. One bind per independent region; use siblings, never nesting.
-- `bind` renders its descendants, not its own attributes — put it on the parent of whatever interpolates.
+- Any top-level `var`/`let`/`const` in a view's `<script>` (or in `index.js`/a project script) is automatically reactive — no `bind=` declaration exists in V2, unlike V1.
+- A function call in a `{{ }}` moustache is evaluated once and then goes stale — compute into a plain reactive variable and re-render on change.
 - `:for` does not resolve the loop variable in nested loops, or in an element's own non-backtick attributes. Build nested / attribute-heavy markup as an HTML string in JS and inject it.
-- A function call in a `{{ }}` moustache is evaluated once and then goes stale — compute into a plain `var` and re-render on change.
 - Forms are handled wholesale via `o-sub` / `b-sub` on the `<form>`; there is no `v-model` equivalent.
+- A DOM-owning plugin/library inside a `:for`/`:if` needs `@before-render`/`@after-render` to reinitialize after a reactive re-render replaces its DOM — it will not know on its own.
+- Never put a raw API secret in `config.json` — use `lm login` + `lm api set <name>` (the vault) instead; the value never touches a local file.
 
 ## Tooling
 
-- [@lmjs/cli](https://www.npmjs.com/package/@lmjs/cli): `lm create <name>`, `lm serve`, `lm build --serverless`. `npm i -g @lmjs/cli`.
-- Deploy: `roxyon init` then `roxyon deploy` (static) — see the Roxyon docs.
+- [@lmjs/cli](https://www.npmjs.com/package/@lmjs/cli) / [@lmjs/core](https://www.npmjs.com/package/@lmjs/core): `npm i -g @lmjs/cli`, then `lm create <name>` (add `--with-plugins` for a real-jQuery + 18-library bundle), `lm serve`, `lm build`.
+- Real npm imports work in `index.js`/project scripts (`npm install`, then `import`) — resolved at build time, zero cost if unused.
+- Secrets: `lm login`, then `lm api set/get/update/list/remove <name>` — never hand-write a credential into `config.json`.
+- Deploy: `roxyon init` then `roxyon deploy` (static) — see the Roxyon docs — or `lm build --deploy` via `config.json`'s `ftp` block.

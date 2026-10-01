@@ -52,6 +52,28 @@ export function registerPrompts(server: McpServer): void {
   );
 
   server.registerPrompt(
+    'install-wordpress',
+    {
+      title: 'Install WordPress on Roxyon',
+      description: 'Provision a host + database and install WordPress core — local/CLI MCP only.',
+      argsSchema: {
+        host: z.string().describe('Where to install it, e.g. blog.mycompany.com'),
+      },
+    },
+    ({ host }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `Install WordPress on ${host}.\n\n1. Read "roxyon://docs/recipe-wordpress" and follow it.\n2. Call roxyon_install_wordpress { host: "${host}" } first without confirm to see the plan.\n3. If it looks right, call it again with confirm:true.\n4. Report the site URL and the database credentials (shown once — pass them on to me now), and tell me to visit the URL to finish WordPress's own setup wizard (site title, admin account).`,
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
     'deploy-to-roxyon',
     {
       title: 'Deploy this project to Roxyon',

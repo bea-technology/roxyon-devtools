@@ -54,6 +54,23 @@ set by the platform — never set them.
 Add both to the repo and pushes to the chosen branch redeploy automatically. A
 git-connected app rejects tarball uploads — push instead.
 
+## Beyond deploy: databases, email, SSH
+
+The Applications/Sites system above is only part of the platform. These tools
+cover the rest — each is a small provision-and-return-once action, not a
+project you iterate on:
+
+| Tool | Does |
+|---|---|
+| `roxyon_database_create` / `roxyon_list_databases` / `roxyon_database_delete` | A MySQL/MariaDB database + user on the shared Galera cluster. The name you pass is a *suffix* — the platform prefixes it with the account's own username, since the DB namespace is shared platform-wide. Returns `{username, password, host}` — the password is shown **once**, capture it immediately. |
+| `roxyon_email_create` / `roxyon_list_emails` / `roxyon_email_delete` | A mailbox on a host already on the account. Password shown once, same as databases. |
+| `roxyon_ssh_reset_password` | Resets the **one shared shell password** for a subscription's container — used for SSH, SFTP, *and* the file manager. Resetting it signs out anything using the old one. Shown once; the platform never stores or re-shows it. |
+| `roxyon_install_wordpress` | Composes the above: create/reuse a host → create a database → download WordPress core → deploy it. Local-filesystem-only (needs somewhere to unpack WordPress), same restriction as `roxyon_init`/`roxyon_deploy`. See the `roxyon://docs/recipe-wordpress` resource. |
+
+`roxyon_add_domain` also takes an optional `phpVersion` (e.g. `"8.3"`) — pass it
+when the host will run a PHP app (WordPress or otherwise); omitted, the
+platform defaults to its own current default version.
+
 ## LumenJS specifics
 
 - No build step for the framework; `.view` files are HTML+JS+CSS interpreted in

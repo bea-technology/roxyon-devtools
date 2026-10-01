@@ -61,6 +61,9 @@ packages/api-client/src/
   sites.ts          static-site upload
   subscriptions.ts  Privileges -> Subscriptions resolution
   domains.ts, env.ts, runtimes.ts, query.ts, errors.ts
+  databases.ts      POST /databases/{create,delete} — MySQL/MariaDB on Galera
+  email.ts          POST /emails/{create,delete} — mailboxes
+  ssh.ts            POST /ssh/password — the shared SSH/SFTP/file-manager password
 packages/deploy-core/src/
   archive.ts        tar+gzip with .roxyonignore / .gitignore, deterministic
   detect.ts         project-type detection for `init`
@@ -68,6 +71,7 @@ packages/deploy-core/src/
   credentials.ts    ~/.roxyon/config.json + env overrides
   deploy.ts         deployProject() — build -> pack -> upload -> poll, event-reported
   run-command.ts    default build-command spawner
+  wordpress.ts      installWordPress() — download core + write wp-config.php (no deploy)
 packages/cli/src/
   index.ts          commander wiring
   commands/*.ts     one file per command group (thin; call deploy-core)
@@ -75,9 +79,10 @@ packages/cli/src/
   context.ts, ui.ts
 packages/mcp-server/src/
   server.ts         createServer() — wires tools + resources + prompts
-  tools.ts          the 11 roxyon_* tools (guard() wraps errors)
+  tools.ts          the roxyon_* tools (guard() wraps errors)
   resources.ts      roxyon://docs/{lumenjs,baas,deploy}
   prompts.ts, session.ts, result.ts
-packages/mcp-server/resources/   lumenjs.md (copied spec), baas.md, deploy.md
+packages/mcp-server/resources/   lumenjs.md (copied spec), baas.md, deploy.md,
+                                  recipe-web-deploy.md, recipe-wordpress.md
 backend/            reference PHP + shell for the new console endpoints
 ```

@@ -11,6 +11,11 @@ the deployed versions live in the Roxyon `_configs` tree:
 | `AccountTokens.php` | `…/libs/AccountTokens.php` — PAT management (`/account/tokens`) |
 | `AccountContext.php` | `…/libs/AccountContext.php` — `GET /account/context` + `GET /account/apps` (PAT-safe) |
 | `ApplicationEnv.php` | `…/libs/ApplicationEnv.php` — `GET/POST /applications/env` (PAT-safe env, bumps ConfigRevision) |
+| `DatabaseCreate.php` | `…/libs/DatabaseCreate.php` — `POST /databases/create` |
+| `DatabaseDelete.php` | `…/libs/DatabaseDelete.php` — `POST /databases/delete` |
+| `EmailCreate.php` | `…/libs/EmailCreate.php` — `POST /emails/create` |
+| `EmailDelete.php` | `…/libs/EmailDelete.php` — `POST /emails/delete` |
+| `SshPasswordReset.php` | `…/libs/SshPasswordReset.php` — `POST /ssh/password` |
 | `migrate-pat.php` | `…/exec/migrate-pat.php` — run once on a node |
 | `app-source-apply.sh` | `_configs/x-x/scripts/clone/app-source-apply.sh` → `/usr/local/bin/` on every app node |
 
@@ -59,18 +64,35 @@ Status: **written and wired in `_configs/…/clone/`, not yet synced to the node
 
 7. **`x-x/scripts/sync.sh`** — scp + `chmod +x` `app-source-apply.sh`.
 
+8. **Databases / Email / SSH** (new) — `DatabaseCreate.php`, `DatabaseDelete.php`,
+   `EmailCreate.php`, `EmailDelete.php`, `SshPasswordReset.php`. Same
+   auth/ownership/short-poll shape as `DomainCreate.php` — write a `pending`
+   BaaS row (or, for SSH, a `Tasks` row directly — there's no BaaS resource to
+   poll for that one) on the master key and let the **already-live**
+   `pollDBs()` / `pollEmails()` / `handleSshPassword()` reconcilers do the
+   actual provisioning. No `worker.php` reconciler logic was added — only the
+   REST surface that was missing. One reconciler-side fix rode along:
+   `add-database.sh` used to interpolate the raw DB password inside a
+   single-quoted SQL string in a bash heredoc (an unescaped `'` broke out of
+   the literal) and received it via argv (visible to `ps`); it now reads the
+   password on stdin and SQL-escapes it, matching `set-ssh-password.sh`'s
+   existing convention. `DomainCreate.php` also grew an optional `phpVersion`
+   field (threaded through to the `add-domain.sh` call `createDomain()`
+   already makes) so a caller can provision a PHP-capable subdomain, e.g. for
+   WordPress.
+
 ## To deploy (per the `_configs` workflow)
 
 ```
 CL=_configs/app-x/console/clone
 # console PHP (new + modified):
-scp $CL/libs/{ApplicationDeploy,ApplicationEnv,SiteDeploy,AccountTokens,AccountContext,ApplicationAction,ApplicationLogs,server_setup}.php  lb-1:/home/_configs/app-x/console/clone/libs/
+scp $CL/libs/{ApplicationDeploy,ApplicationEnv,SiteDeploy,AccountTokens,AccountContext,ApplicationAction,ApplicationLogs,server_setup,DomainCreate,DatabaseCreate,DatabaseDelete,EmailCreate,EmailDelete,SshPasswordReset}.php  lb-1:/home/_configs/app-x/console/clone/libs/
 scp $CL/core/server.php   lb-1:/home/_configs/app-x/console/clone/core/
 scp $CL/exec/{worker,migrate-pat}.php  lb-1:/home/_configs/app-x/console/clone/exec/
 scp _configs/app-x/console/sync.sh   lb-1:/home/_configs/app-x/console/    # trigger
 
-# node script:
-scp _configs/x-x/scripts/clone/app-source-apply.sh  lb-1:/home/_configs/x-x/scripts/clone/
+# node scripts:
+scp _configs/x-x/scripts/clone/{app-source-apply,add-database}.sh  lb-1:/home/_configs/x-x/scripts/clone/
 scp _configs/x-x/scripts/sync.sh   lb-1:/home/_configs/x-x/scripts/       # trigger
 ```
 
@@ -110,6 +132,23 @@ curl -sS -X POST "https://console.roxyon.com/sites/deploy?host=<yourhost>&folder
 curl -sS -X POST "https://console.roxyon.com/applications/deploy?host=<yourhost>&folder=demo&runtime=node" \
   -H "Authorization: Bearer $PAT" -H 'Content-Type: application/gzip' --data-binary @/tmp/t.tgz
 # -> {"ok":true,"application":"<newid>","created":true,"configRevision":1,...}
+
+# database — password shown once in the response
+curl -sS -X POST "https://console.roxyon.com/databases/create" \
+  -H "Authorization: Bearer $PAT" -H 'Content-Type: application/json' \
+  -d '{"name":"wordpress"}'
+# -> {"ok":true,"objectId":"...","name":"<acct>_wordpress","username":"...","password":"...","host":"10.0.0.x:6033","status":"active"}
+
+# mailbox
+curl -sS -X POST "https://console.roxyon.com/emails/create" \
+  -H "Authorization: Bearer $PAT" -H 'Content-Type: application/json' \
+  -d '{"localPart":"info","domain":"<yourhost>"}'
+# -> {"ok":true,"objectId":"...","email":"info@<yourhost>","password":"...","status":"active"}
+
+# ssh/sftp/file-manager password reset
+curl -sS -X POST "https://console.roxyon.com/ssh/password" \
+  -H "Authorization: Bearer $PAT" -H 'Content-Type: application/json' -d '{}'
+# -> {"ok":true,"subscription":"...","password":"...","status":"active"}
 
 # path traversal is refused
 tar -czf /tmp/bad.tgz -C /tmp --transform 's,^,../,' t/index.html
