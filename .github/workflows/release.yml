@@ -54,13 +54,21 @@ jobs:
           # No NODE_AUTH_TOKEN: publishing uses OIDC trusted publishing.
 
       # Keep the MCP registry (and the checked-in server.json) in step with the
-      # published @roxyon/mcp version. No-ops on every ordinary push; only
-      # publishes after a release bumped it. Manual re-run: Actions →
-      # "Publish to MCP Registry".
+      # published @roxyon/mcp version. Runs only when the Changesets step really
+      # published (on the "version packages" PR run the working copy already
+      # holds the unpublished bumped version, so running there always fails).
+      # Manual re-run: Actions → "Publish to MCP Registry".
       - name: Update MCP registry
+        if: steps.changesets.outputs.published == 'true'
         run: |
           SERVER_NAME="io.github.bea-technology/roxyon"
           MCP_V=$(node -p "require('./packages/mcp-server/package.json').version")
+          # npm takes a little while to serve a just-published version, and the
+          # MCP registry validates against npm — wait for it (up to ~5 min).
+          for i in $(seq 1 30); do
+            [ "$(npm view @roxyon/mcp@$MCP_V version 2>/dev/null)" = "$MCP_V" ] && break
+            echo "waiting for @roxyon/mcp@$MCP_V on npm ($i/30)"; sleep 10
+          done
           # The registry returns one row per published version — skip only if a
           # row for OUR name already carries this exact version.
           HAVE=$(curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=roxyon" | node -e "
