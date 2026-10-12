@@ -1,6 +1,6 @@
 {
   "name": "@roxyon/rxjs",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "private": true,
   "description": "rx.js: the browser client for Roxyon BaaS. 2.0.0 talks to V2 (src/rx.js, published at cdn.roxyon.com/libs/rxjs/2.0.0/rx.js); 1.0.0 (v1/rx.js, V1) is kept as published.",
   "type": "module",

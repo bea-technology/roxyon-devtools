@@ -1,5 +1,6 @@
 /*!
- * rx.js 2.0.2: Roxyon BaaS V2 client for the browser.
+ * rx.js 2.0.3: Roxyon BaaS V2 client for the browser.
+ * 2.0.3: get('/_Locale') reads the app's site texts (when the project opened them), not an engine endpoint.
  * 2.0.2: get('/Class/categories') lists a class's categories; rx.contact({ name, email, subject, message }) sends
  * the site's contact form (to the address the project owner set, never one the page names).
  * 2.0.1: everything is inside one function scope; only window.RX (and window.RXEngine) are set, so a page can also
@@ -195,7 +196,7 @@ class Engine {
             const r = await this._call("POST", "/tasks", data);
             return r.body && r.body.ok ? r.body : Engine._err(r);
         }
-        if (head.charAt(0) === "_") {
+        if (head.charAt(0) === "_" && head !== "_Locale") {
             const r = await this._call(m, "/engine/" + parts.map(encodeURIComponent).join("/"), m === "GET" ? undefined : data, m === "GET" ? data : undefined);
             return r.body && r.body.ok !== false && "result" in r.body ? r.body.result : Engine._err(r);
         }

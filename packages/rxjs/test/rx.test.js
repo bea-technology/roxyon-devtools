@@ -166,3 +166,13 @@ describe('rx.js 2.0.2', () => {
     expect(await rx.post('/contact', { name: 'A', email: 'a@x.org', message: 'm' })).toEqual({ ok: true, sent: true });
   });
 });
+
+describe('rx.js 2.0.3', () => {
+  it('reads _Locale as records and passes V1 read options through', async () => {
+    const { RX, calls } = load(server({ 'GET /records/_Locale': () => [200, { ok: true, results: [{ Key: 'home.title', en: 'Welcome' }] }] }));
+    const rx = new RX({ publishableKey: 'k' });
+    expect(await rx.get('/_Locale', { fields: '*' })).toEqual({ results: [{ Key: 'home.title', en: 'Welcome' }] });
+    await rx.get('/Plans', { limit: 2, media: 'files,images', crops: 'ax600', categories: 'c1' });
+    expect(decodeURIComponent(calls.at(-1).query)).toBe('?limit=2&media=files,images&crops=ax600&categories=c1');
+  });
+});
