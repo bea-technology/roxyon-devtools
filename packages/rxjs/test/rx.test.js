@@ -150,3 +150,19 @@ describe('rx.js 2.0.1 scope', () => {
     expect(typeof globalThis.window.RXEngine).toBe('function');
   });
 });
+
+describe('rx.js 2.0.2', () => {
+  it('lists categories and sends the contact form', async () => {
+    const { RX, calls } = load(
+      server({
+        'GET /records/Resources/categories': () => [200, { ok: true, results: [{ objectId: 'c1', Name: 'Guides' }] }],
+        'POST /contact': (r) => [200, { ok: true, sent: true }],
+      }),
+    );
+    const rx = new RX({ publishableKey: 'k' });
+    expect(await rx.get('/Resources/categories')).toEqual({ results: [{ objectId: 'c1', Name: 'Guides' }] });
+    expect(await rx.contact({ name: 'Rana', email: 'r@x.org', message: 'Hi' })).toEqual({ ok: true, sent: true });
+    expect(calls.find((c) => c.path === '/contact').body).toEqual({ name: 'Rana', email: 'r@x.org', subject: '', message: 'Hi', website: '' });
+    expect(await rx.post('/contact', { name: 'A', email: 'a@x.org', message: 'm' })).toEqual({ ok: true, sent: true });
+  });
+});

@@ -1,11 +1,13 @@
 /*!
- * rx.js 2.0.1: Roxyon BaaS V2 client for the browser.
+ * rx.js 2.0.2: Roxyon BaaS V2 client for the browser.
+ * 2.0.2: get('/Class/categories') lists a class's categories; rx.contact({ name, email, subject, message }) sends
+ * the site's contact form (to the address the project owner set, never one the page names).
  * 2.0.1: everything is inside one function scope; only window.RX (and window.RXEngine) are set, so a page can also
  * load V1's own script (which declares a global `class Engine`) without a clash.
  *
  * Same calls as rx.js 1.0.0, so a site moves by changing its script tag and config:
  *
- *   <script src="https://cdn.roxyon.com/libs/rxjs/2.0.1/rx.js"></script>
+ *   <script src="https://cdn.roxyon.com/libs/rxjs/2.0.2/rx.js"></script>
  *   const rx = new RX({ publishableKey: 'rxpk_...' });
  *   rx.get('/Plans', { where: { Status: 'active' }, limit: 20 });   // -> { results: [...] }
  *
@@ -188,6 +190,7 @@ class Engine {
         const head = parts[0] || "";
         if (head.toLowerCase() === "auth") return this._auth(parts[1] || "", data);
         if (head.toLowerCase() === "batch") return this._batch(data);
+        if (head.toLowerCase() === "contact") return this.contact(data);
         if (head.toLowerCase() === "tasks") {
             const r = await this._call("POST", "/tasks", data);
             return r.body && r.body.ok ? r.body : Engine._err(r);
@@ -204,6 +207,10 @@ class Engine {
         delete data.objectId;
         const path = "/records/" + encodeURIComponent(cls) + (id ? "/" + encodeURIComponent(id) : "");
         if (m === "GET" && !id) return this._list(path, data);
+        if (m === "GET" && id === "categories") {
+            const c = await this._call("GET", path);
+            return c.body && c.body.ok ? { results: c.body.results || [] } : Engine._err(c);
+        }
         const r = await this._call(m, path, m === "GET" || m === "DELETE" ? undefined : { data }, m === "GET" ? data : undefined);
         if (!(r.body && r.body.ok)) return Engine._err(r);
         if (m === "DELETE") return { results: [{ objectId: id }] };
@@ -289,6 +296,13 @@ class Engine {
         const r = await this._raw("POST", "/auth/login", { key: this.key, email: String(email) });
         if (r.body && r.body.challengeId) return { challengeId: r.body.challengeId, destination: r.body.destination, resendAfter: r.body.resendAfter };
         return Engine._err(r);
+    }
+
+    /** The site's contact form: { name, email, subject?, message } -> { ok: true, sent: true } or { error }. */
+    async contact(d) {
+        d = d || {};
+        const r = await this._call("POST", "/contact", { name: d.name || d.Name, email: d.email || d.Email, subject: d.subject || d.Subject || "", message: d.message || d.Message, website: d.website || "" });
+        return r.body && r.body.ok ? r.body : Engine._err(r);
     }
 
     register() {
