@@ -1,9 +1,11 @@
 /*!
- * rx.js 2.0.0: Roxyon BaaS V2 client for the browser.
+ * rx.js 2.0.1: Roxyon BaaS V2 client for the browser.
+ * 2.0.1: everything is inside one function scope; only window.RX (and window.RXEngine) are set, so a page can also
+ * load V1's own script (which declares a global `class Engine`) without a clash.
  *
  * Same calls as rx.js 1.0.0, so a site moves by changing its script tag and config:
  *
- *   <script src="https://cdn.roxyon.com/libs/rxjs/2.0.0/rx.js"></script>
+ *   <script src="https://cdn.roxyon.com/libs/rxjs/2.0.1/rx.js"></script>
  *   const rx = new RX({ publishableKey: 'rxpk_...' });
  *   rx.get('/Plans', { where: { Status: 'active' }, limit: 20 });   // -> { results: [...] }
  *
@@ -15,6 +17,9 @@
  *  - Errors resolve (never reject) as { error: message, code, status }, like 1.0.0's failed writes.
  *  - limit -1 ("everything") is read page by page, up to 5000 rows.
  */
+(function () {
+"use strict";
+
 class Engine {
     config = {};
     baseURL = "https://www.beaapis.com/2";
@@ -323,3 +328,4 @@ if (typeof window !== "undefined") {
     window.RX = RX;
     window.RXEngine = Engine;
 }
+})();

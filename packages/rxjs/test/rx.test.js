@@ -17,7 +17,8 @@ function load(server) {
     return new Response(JSON.stringify(json), { status });
   };
   const src = readFileSync(new URL('../src/rx.js', import.meta.url), 'utf8');
-  const { RX } = new Function(`${src}\nreturn { RX, Engine };`)();
+  new Function(src)();
+  const RX = globalThis.window.RX;
   return { RX, calls, store };
 }
 
@@ -136,5 +137,16 @@ describe('rx.js 2.0.0 (V2)', () => {
     const r = await new RX({ publishableKey: 'k' }).get('/Plans/p1');
     expect(r.results[0].objectId).toBe('p1');
     expect(calls.filter((c) => c.path === '/auth/public')).toHaveLength(2);
+  });
+});
+
+describe('rx.js 2.0.1 scope', () => {
+  it('declares no global Engine (V1 pages declare their own), only window.RX / window.RXEngine', () => {
+    const src = readFileSync(new URL('../src/rx.js', import.meta.url), 'utf8');
+    globalThis.window = { localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, crypto: globalThis.crypto };
+    // A page that already has V1's global class Engine, then loads 2.0.1: no redeclaration error.
+    expect(() => new Function(`class Engine {}\n${src}\nreturn typeof Engine;`)()).not.toThrow();
+    expect(typeof globalThis.window.RX).toBe('function');
+    expect(typeof globalThis.window.RXEngine).toBe('function');
   });
 });
