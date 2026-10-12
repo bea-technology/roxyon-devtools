@@ -1,0 +1,16 @@
+{
+  "name": "@roxyon/rxjs",
+  "version": "2.0.0",
+  "private": true,
+  "description": "rx.js: the browser client for Roxyon BaaS. 2.0.0 talks to V2 (src/rx.js, published at cdn.roxyon.com/libs/rxjs/2.0.0/rx.js); 1.0.0 (v1/rx.js, V1) is kept as published.",
+  "type": "module",
+  "files": ["src", "v1"],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "node --check src/rx.js && node --check v1/rx.js",
+    "build": "node --check src/rx.js"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.3"
+  }
+}
