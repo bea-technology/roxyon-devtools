@@ -5,15 +5,32 @@ import { describe, expect, it } from 'vitest';
 function load(server) {
   const store = new Map();
   globalThis.window = {
-    localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
+    localStorage: {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+    },
     crypto: globalThis.crypto,
   };
   const calls = [];
   globalThis.fetch = async (url, init) => {
     const u = new URL(url);
     const body = init.body ? JSON.parse(init.body) : undefined;
-    calls.push({ method: init.method, path: u.pathname.replace(/^\/2/, ''), query: u.search, auth: init.headers.authorization ?? null, device: init.headers['x-bea-installation-id'], body });
-    const [status, json] = await server({ method: init.method, path: u.pathname.replace(/^\/2/, ''), search: u.searchParams, auth: init.headers.authorization ?? null, body });
+    calls.push({
+      method: init.method,
+      path: u.pathname.replace(/^\/2/, ''),
+      query: u.search,
+      auth: init.headers.authorization ?? null,
+      device: init.headers['x-bea-installation-id'],
+      body,
+    });
+    const [status, json] = await server({
+      method: init.method,
+      path: u.pathname.replace(/^\/2/, ''),
+      search: u.searchParams,
+      auth: init.headers.authorization ?? null,
+      body,
+    });
     return new Response(JSON.stringify(json), { status });
   };
   const src = readFileSync(new URL('../src/rx.js', import.meta.url), 'utf8');
@@ -28,7 +45,8 @@ let tokens = 0;
 function server(over = {}) {
   return async (r) => {
     if (over[`${r.method} ${r.path}`]) return over[`${r.method} ${r.path}`](r);
-    if (r.method === 'POST' && r.path === '/auth/public') return [200, { ok: true, access_token: `pub${++tokens}`, expires_in: 3600 }];
+    if (r.method === 'POST' && r.path === '/auth/public')
+      return [200, { ok: true, access_token: `pub${++tokens}`, expires_in: 3600 }];
     if (!r.auth) return [401, { ok: false, error: 'not_signed_in', message: 'sign in' }];
     if (r.method === 'GET' && r.path === '/records/Plans') {
       const skip = Number(r.search.get('skip') ?? 0);
@@ -36,11 +54,16 @@ function server(over = {}) {
       const all = Array.from({ length: 450 }, (_, i) => ({ objectId: `p${i}` }));
       return [200, { ok: true, results: all.slice(skip, skip + limit) }];
     }
-    if (r.method === 'GET' && r.path === '/records/Plans/p1') return [200, { ok: true, result: { objectId: 'p1', Name: 'One' } }];
-    if (r.method === 'POST' && r.path === '/records/Notes') return [200, { ok: true, result: { objectId: 'n1', ...r.body.data } }];
-    if (r.method === 'PUT' && r.path === '/records/Notes/n1') return [200, { ok: true, result: { objectId: 'n1', ...r.body.data } }];
-    if (r.method === 'DELETE' && r.path === '/records/Notes/n1') return [200, { ok: true, id: 'n1' }];
-    if (r.method === 'PUT' && r.path === '/records/Users/u1') return [403, { ok: false, error: 'field_forbidden', message: "you can't write Wallet" }];
+    if (r.method === 'GET' && r.path === '/records/Plans/p1')
+      return [200, { ok: true, result: { objectId: 'p1', Name: 'One' } }];
+    if (r.method === 'POST' && r.path === '/records/Notes')
+      return [200, { ok: true, result: { objectId: 'n1', ...r.body.data } }];
+    if (r.method === 'PUT' && r.path === '/records/Notes/n1')
+      return [200, { ok: true, result: { objectId: 'n1', ...r.body.data } }];
+    if (r.method === 'DELETE' && r.path === '/records/Notes/n1')
+      return [200, { ok: true, id: 'n1' }];
+    if (r.method === 'PUT' && r.path === '/records/Users/u1')
+      return [403, { ok: false, error: 'field_forbidden', message: "you can't write Wallet" }];
     return [404, { ok: false, error: 'not_found', message: 'no such route' }];
   };
 }
@@ -49,7 +72,10 @@ describe('rx.js 2.0.0 (V2)', () => {
   it('opens a public session from the publishable key once, bound to this device, and lists in 1.0.0 shape', async () => {
     const { RX, calls } = load(server());
     const rx = new RX({ publishableKey: 'rxpk_test_123' });
-    const [a, b] = await Promise.all([rx.get('/Plans', { where: { Status: 'active' }, limit: 2 }), rx.get('/Plans', { limit: 1 })]);
+    const [a, b] = await Promise.all([
+      rx.get('/Plans', { where: { Status: 'active' }, limit: 2 }),
+      rx.get('/Plans', { limit: 1 }),
+    ]);
     expect(a).toEqual({ results: [{ objectId: 'p0' }, { objectId: 'p1' }] });
     expect(b.results).toHaveLength(1);
     expect(calls.filter((c) => c.path === '/auth/public')).toHaveLength(1);
@@ -71,48 +97,106 @@ describe('rx.js 2.0.0 (V2)', () => {
     const { RX } = load(server());
     const rx = new RX({ publishableKey: 'k' });
     expect(await rx.get('/Plans/p1')).toEqual({ results: [{ objectId: 'p1', Name: 'One' }] });
-    expect((await rx.post('/Notes', { Text: 'hi' })).results[0]).toEqual({ objectId: 'n1', Text: 'hi' });
-    expect((await rx.put('/Notes', { objectId: 'n1', Text: 'edited' })).results[0].Text).toBe('edited');
+    expect((await rx.post('/Notes', { Text: 'hi' })).results[0]).toEqual({
+      objectId: 'n1',
+      Text: 'hi',
+    });
+    expect((await rx.put('/Notes', { objectId: 'n1', Text: 'edited' })).results[0].Text).toBe(
+      'edited',
+    );
     expect(await rx.delete('/Notes/n1')).toEqual({ results: [{ objectId: 'n1' }] });
-    expect(await rx.put('/Users/u1', { Wallet: 9 })).toEqual({ error: "you can't write Wallet", code: 'field_forbidden', status: 403 });
+    expect(await rx.put('/Users/u1', { Wallet: 9 })).toEqual({
+      error: "you can't write Wallet",
+      code: 'field_forbidden',
+      status: 403,
+    });
   });
 
   it('batch, engine endpoints and tasks', async () => {
     const { RX, calls } = load(
       server({
-        'POST /batch': (r) => [200, { ok: true, results: [{ status: 200, ok: true, results: [{ objectId: 'p0' }], count: 9 }, { status: 404, ok: false, error: 'not_found', message: 'no such record' }, { status: 200, ok: true, result: { objectId: 'x1' } }] }],
-        'GET /engine/_payment/methods': () => [200, { ok: true, result: { gateway: 'stripe', savedCards: [] } }],
+        'POST /batch': (r) => [
+          200,
+          {
+            ok: true,
+            results: [
+              { status: 200, ok: true, results: [{ objectId: 'p0' }], count: 9 },
+              { status: 404, ok: false, error: 'not_found', message: 'no such record' },
+              { status: 200, ok: true, result: { objectId: 'x1' } },
+            ],
+          },
+        ],
+        'GET /engine/_payment/methods': () => [
+          200,
+          { ok: true, result: { gateway: 'stripe', savedCards: [] } },
+        ],
         'POST /tasks': (r) => [200, { ok: true, id: 't1' }],
       }),
     );
     const rx = new RX({ publishableKey: 'k' });
-    const b = await rx.post('/Batch', { requests: [{ path: '/Plans', method: 'get', body: { count: 1, limit: 0 } }, { path: '/Plans/zz', method: 'GET' }, { path: '/Notes', method: 'POST', body: { Text: 'x' } }] });
-    expect(b).toEqual([{ results: [{ objectId: 'p0' }], count: 9 }, { error: 'no such record', code: 'not_found', status: 404 }, { results: [{ objectId: 'x1' }] }]);
+    const b = await rx.post('/Batch', {
+      requests: [
+        { path: '/Plans', method: 'get', body: { count: 1, limit: 0 } },
+        { path: '/Plans/zz', method: 'GET' },
+        { path: '/Notes', method: 'POST', body: { Text: 'x' } },
+      ],
+    });
+    expect(b).toEqual([
+      { results: [{ objectId: 'p0' }], count: 9 },
+      { error: 'no such record', code: 'not_found', status: 404 },
+      { results: [{ objectId: 'x1' }] },
+    ]);
     expect(calls.find((c) => c.path === '/batch').body.requests[0].method).toBe('GET');
-    expect(await rx.get('/_payment/methods', { currency: 'USD' })).toEqual({ gateway: 'stripe', savedCards: [] });
+    expect(await rx.get('/_payment/methods', { currency: 'USD' })).toEqual({
+      gateway: 'stripe',
+      savedCards: [],
+    });
     expect(calls.find((c) => c.path === '/engine/_payment/methods').query).toBe('?currency=USD');
-    expect(await rx.post('/tasks', { action: 'ssl.renew', domain: 'd1' })).toEqual({ ok: true, id: 't1' });
+    expect(await rx.post('/tasks', { action: 'ssl.renew', domain: 'd1' })).toEqual({
+      ok: true,
+      id: 't1',
+    });
   });
 
   it('a batch item with limit -1 is read page by page, in its place (2.0.4; V2 treats -1 in a batch as 1 row)', async () => {
     const { RX, calls } = load(
       server({
-        'POST /batch': (r) => [200, { ok: true, results: r.body.requests.map((q) => (q.path === '/Plans/p1' ? { status: 200, ok: true, result: { objectId: 'p1' } } : { status: 200, ok: true, results: [{ objectId: 'n0' }] })) }],
+        'POST /batch': (r) => [
+          200,
+          {
+            ok: true,
+            results: r.body.requests.map((q) =>
+              q.path === '/Plans/p1'
+                ? { status: 200, ok: true, result: { objectId: 'p1' } }
+                : { status: 200, ok: true, results: [{ objectId: 'n0' }] },
+            ),
+          },
+        ],
       }),
     );
     const rx = new RX({ publishableKey: 'k' });
-    const b = await rx.post('/batch', { requests: [{ path: '/Notes', method: 'GET', body: { limit: 5 } }, { path: '/Plans', method: 'GET', body: { fields: '*', limit: -1 } }, { path: '/Plans/p1', method: 'GET' }] });
+    const b = await rx.post('/batch', {
+      requests: [
+        { path: '/Notes', method: 'GET', body: { limit: 5 } },
+        { path: '/Plans', method: 'GET', body: { fields: '*', limit: -1 } },
+        { path: '/Plans/p1', method: 'GET' },
+      ],
+    });
     expect(b[0]).toEqual({ results: [{ objectId: 'n0' }] });
     expect(b[1].results).toHaveLength(450);
     expect(b[2]).toEqual({ results: [{ objectId: 'p1' }] });
     const sent = calls.find((c) => c.path === '/batch').body.requests;
     expect(sent.map((q) => q.path)).toEqual(['/Notes', '/Plans/p1']);
-    expect(calls.filter((c) => c.path === '/records/Plans').every((c) => /limit=200/.test(c.query))).toBe(true);
+    expect(
+      calls.filter((c) => c.path === '/records/Plans').every((c) => /limit=200/.test(c.query)),
+    ).toBe(true);
   });
 
   it('a batch of only limit -1 lists sends no /batch call', async () => {
     const { RX, calls } = load(server());
-    const b = await new RX({ publishableKey: 'k' }).post('/batch', { requests: [{ path: '/records/Plans', method: 'GET', body: { limit: -1 } }] });
+    const b = await new RX({ publishableKey: 'k' }).post('/batch', {
+      requests: [{ path: '/records/Plans', method: 'GET', body: { limit: -1 } }],
+    });
     expect(b[0].results).toHaveLength(450);
     expect(calls.some((c) => c.path === '/batch')).toBe(false);
   });
@@ -122,14 +206,29 @@ describe('rx.js 2.0.0 (V2)', () => {
     const user = jwt({ uid: 'u1', exp: 9999999999 });
     const { RX, calls } = load(
       server({
-        'POST /auth/login': (r) => [200, { ok: true, challengeId: 'ch1', destination: 'a***@x.com' }],
-        'POST /auth/login/verify': (r) => (r.body.code === '123456' ? [200, { ok: true, access_token: user, expires_in: 3600 }] : [401, { ok: false, error: 'code_rejected', message: 'wrong code' }]),
-        'GET /records/Users/u1': (r) => (r.auth === `Bearer ${user}` ? [200, { ok: true, result: { objectId: 'u1', Email: 'a@x.com' } }] : [401, { ok: false, error: 'expired' }]),
+        'POST /auth/login': (r) => [
+          200,
+          { ok: true, challengeId: 'ch1', destination: 'a***@x.com' },
+        ],
+        'POST /auth/login/verify': (r) =>
+          r.body.code === '123456'
+            ? [200, { ok: true, access_token: user, expires_in: 3600 }]
+            : [401, { ok: false, error: 'code_rejected', message: 'wrong code' }],
+        'GET /records/Users/u1': (r) =>
+          r.auth === `Bearer ${user}`
+            ? [200, { ok: true, result: { objectId: 'u1', Email: 'a@x.com' } }]
+            : [401, { ok: false, error: 'expired' }],
       }),
     );
     const rx = new RX({ publishableKey: 'k', onSignedOut: () => signedOut++ });
-    expect(await rx.login({ email: 'a@x.com' })).toEqual({ challengeId: 'ch1', destination: 'a***@x.com', resendAfter: undefined });
-    expect(await rx.login({ challengeId: 'ch1', code: '000000' })).toMatchObject({ code: 'code_rejected' });
+    expect(await rx.login({ email: 'a@x.com' })).toEqual({
+      challengeId: 'ch1',
+      destination: 'a***@x.com',
+      resendAfter: undefined,
+    });
+    expect(await rx.login({ challengeId: 'ch1', code: '000000' })).toMatchObject({
+      code: 'code_rejected',
+    });
     expect(rx.isLoggedIn()).toBe(false);
     expect(await rx.login({ challengeId: 'ch1', code: '123456' })).toBe('success');
     expect(rx.isLoggedIn()).toBe(true);
@@ -166,7 +265,10 @@ describe('rx.js 2.0.0 (V2)', () => {
 describe('rx.js 2.0.1 scope', () => {
   it('declares no global Engine (V1 pages declare their own), only window.RX / window.RXEngine', () => {
     const src = readFileSync(new URL('../src/rx.js', import.meta.url), 'utf8');
-    globalThis.window = { localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, crypto: globalThis.crypto };
+    globalThis.window = {
+      localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+      crypto: globalThis.crypto,
+    };
     // A page that already has V1's global class Engine, then loads 2.0.1: no redeclaration error.
     expect(() => new Function(`class Engine {}\n${src}\nreturn typeof Engine;`)()).not.toThrow();
     expect(typeof globalThis.window.RX).toBe('function');
@@ -178,24 +280,52 @@ describe('rx.js 2.0.2', () => {
   it('lists categories and sends the contact form', async () => {
     const { RX, calls } = load(
       server({
-        'GET /records/Resources/categories': () => [200, { ok: true, results: [{ objectId: 'c1', Name: 'Guides' }] }],
+        'GET /records/Resources/categories': () => [
+          200,
+          { ok: true, results: [{ objectId: 'c1', Name: 'Guides' }] },
+        ],
         'POST /contact': (r) => [200, { ok: true, sent: true }],
       }),
     );
     const rx = new RX({ publishableKey: 'k' });
-    expect(await rx.get('/Resources/categories')).toEqual({ results: [{ objectId: 'c1', Name: 'Guides' }] });
-    expect(await rx.contact({ name: 'Rana', email: 'r@x.org', message: 'Hi' })).toEqual({ ok: true, sent: true });
-    expect(calls.find((c) => c.path === '/contact').body).toEqual({ name: 'Rana', email: 'r@x.org', subject: '', message: 'Hi', website: '' });
-    expect(await rx.post('/contact', { name: 'A', email: 'a@x.org', message: 'm' })).toEqual({ ok: true, sent: true });
+    expect(await rx.get('/Resources/categories')).toEqual({
+      results: [{ objectId: 'c1', Name: 'Guides' }],
+    });
+    expect(await rx.contact({ name: 'Rana', email: 'r@x.org', message: 'Hi' })).toEqual({
+      ok: true,
+      sent: true,
+    });
+    expect(calls.find((c) => c.path === '/contact').body).toEqual({
+      name: 'Rana',
+      email: 'r@x.org',
+      subject: '',
+      message: 'Hi',
+      website: '',
+    });
+    expect(await rx.post('/contact', { name: 'A', email: 'a@x.org', message: 'm' })).toEqual({
+      ok: true,
+      sent: true,
+    });
   });
 });
 
 describe('rx.js 2.0.3', () => {
   it('reads _Locale as records and passes V1 read options through', async () => {
-    const { RX, calls } = load(server({ 'GET /records/_Locale': () => [200, { ok: true, results: [{ Key: 'home.title', en: 'Welcome' }] }] }));
+    const { RX, calls } = load(
+      server({
+        'GET /records/_Locale': () => [
+          200,
+          { ok: true, results: [{ Key: 'home.title', en: 'Welcome' }] },
+        ],
+      }),
+    );
     const rx = new RX({ publishableKey: 'k' });
-    expect(await rx.get('/_Locale', { fields: '*' })).toEqual({ results: [{ Key: 'home.title', en: 'Welcome' }] });
+    expect(await rx.get('/_Locale', { fields: '*' })).toEqual({
+      results: [{ Key: 'home.title', en: 'Welcome' }],
+    });
     await rx.get('/Plans', { limit: 2, media: 'files,images', crops: 'ax600', categories: 'c1' });
-    expect(decodeURIComponent(calls.at(-1).query)).toBe('?limit=2&media=files,images&crops=ax600&categories=c1');
+    expect(decodeURIComponent(calls.at(-1).query)).toBe(
+      '?limit=2&media=files,images&crops=ax600&categories=c1',
+    );
   });
 });
