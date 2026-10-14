@@ -6,12 +6,13 @@
 | 2.0.0 | V2 (`/2`, publishable key, per-class rules) | `https://cdn.roxyon.com/libs/rxjs/2.0.0/rx.js` | `v2.0.0/rx.js` (declares a global `class Engine`) |
 | 2.0.1 | V2, same API; one function scope, only `window.RX`/`window.RXEngine`, safe next to V1's script | `https://cdn.roxyon.com/libs/rxjs/2.0.1/rx.js` | `v2.0.1/rx.js` |
 | 2.0.2 | + `get('/Class/categories')`, `rx.contact({name, email, subject, message})` | `https://cdn.roxyon.com/libs/rxjs/2.0.2/rx.js` | `v2.0.2/rx.js` |
-| 2.0.3 | + `get('/_Locale')` (site texts, when the project opened them) | `https://cdn.roxyon.com/libs/rxjs/2.0.3/rx.js` | `src/rx.js` |
+| 2.0.3 | + `get('/_Locale')` (site texts, when the project opened them) | `https://cdn.roxyon.com/libs/rxjs/2.0.3/rx.js` | `v2.0.3/rx.js` |
+| 2.0.4 | a batch item with `limit: -1` (or over 200) is read page by page; 2.0.3 got 1 row back for it | `https://cdn.roxyon.com/libs/rxjs/2.0.4/rx.js` | `src/rx.js` |
 
 1.0.0 is never changed: sites on V1 keep working. An app moves to V2 by switching its script tag and config:
 
 ```html
-<script src="https://cdn.roxyon.com/libs/rxjs/2.0.3/rx.js"></script>
+<script src="https://cdn.roxyon.com/libs/rxjs/2.0.4/rx.js"></script>
 <script>
   const rx = new RX({ publishableKey: 'rxpk_…' }); // from the project's API keys in the console (Roxyon Base)
 </script>

@@ -1,5 +1,6 @@
 /*!
- * rx.js 2.0.3: Roxyon BaaS V2 client for the browser.
+ * rx.js 2.0.4: Roxyon BaaS V2 client for the browser.
+ * 2.0.4: a batch item asking for every row (limit -1, or over 200) is read page by page instead of returning one row.
  * 2.0.3: get('/_Locale') reads the app's site texts (when the project opened them), not an engine endpoint.
  * 2.0.2: get('/Class/categories') lists a class's categories; rx.contact({ name, email, subject, message }) sends
  * the site's contact form (to the address the project owner set, never one the page names).
@@ -243,18 +244,37 @@ class Engine {
         return { results: out, ...(count !== undefined ? { count } : {}) };
     }
 
-    /** POST /batch { requests: [{ path, method, body }] } -> [each request's 1.0.0-shaped answer]. */
+    /**
+     * POST /batch { requests: [{ path, method, body }] } -> [each request's 1.0.0-shaped answer].
+     * A list asking for every row (limit -1, or over 200) can't be one batch item, since V2 caps a page at 200:
+     * it is read on its own, page by page like get(), and its answer keeps its place in the array.
+     */
     async _batch(data) {
         const requests = (data.requests || []).map((x) => ({ path: x.path, method: String(x.method || "GET").toUpperCase(), body: x.body || {} }));
-        const r = await this._call("POST", "/batch", { requests });
-        if (!(r.body && r.body.ok)) return Engine._err(r);
-        return (r.body.results || []).map((x, i) => {
-            if (x.ok === false) return { error: x.message || x.error, code: x.error, status: x.status };
-            const m = requests[i] ? requests[i].method : "GET";
-            if ("results" in x) return { results: x.results, ...("count" in x ? { count: x.count } : {}) };
-            if (m === "DELETE") return { results: [{ objectId: x.id }] };
-            return { results: x.result ? [x.result] : [] };
-        });
+        const listOf = (x) => {
+            const parts = String(x.path || "").split("/").filter(Boolean);
+            if (parts[0] && parts[0].toLowerCase() === "records") parts.shift();
+            const want = Number(x.body.limit);
+            return x.method === "GET" && parts.length === 1 && (want < 0 || want > 200) ? parts[0] : null;
+        };
+        const out = new Array(requests.length);
+        const paged = requests.map((x, i) => [i, listOf(x)]).filter(([, cls]) => cls);
+        const rest = requests.map((x, i) => i).filter((i) => !paged.some(([j]) => j === i));
+        const pages = Promise.all(paged.map(([i, cls]) => this._records("GET", cls, null, { ...requests[i].body }).then((a) => { out[i] = a; })));
+        if (rest.length) {
+            const r = await this._call("POST", "/batch", { requests: rest.map((i) => requests[i]) });
+            if (!(r.body && r.body.ok)) return Engine._err(r);
+            (r.body.results || []).forEach((x, k) => {
+                const i = rest[k];
+                const m = requests[i].method;
+                if (x.ok === false) out[i] = { error: x.message || x.error, code: x.error, status: x.status };
+                else if ("results" in x) out[i] = { results: x.results, ...("count" in x ? { count: x.count } : {}) };
+                else if (m === "DELETE") out[i] = { results: [{ objectId: x.id }] };
+                else out[i] = { results: x.result ? [x.result] : [] };
+            });
+        }
+        await pages;
+        return out;
     }
 
     // --- sign-in --------------------------------------------------------------------------------------

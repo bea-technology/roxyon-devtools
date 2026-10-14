@@ -94,6 +94,29 @@ describe('rx.js 2.0.0 (V2)', () => {
     expect(await rx.post('/tasks', { action: 'ssl.renew', domain: 'd1' })).toEqual({ ok: true, id: 't1' });
   });
 
+  it('a batch item with limit -1 is read page by page, in its place (2.0.4; V2 treats -1 in a batch as 1 row)', async () => {
+    const { RX, calls } = load(
+      server({
+        'POST /batch': (r) => [200, { ok: true, results: r.body.requests.map((q) => (q.path === '/Plans/p1' ? { status: 200, ok: true, result: { objectId: 'p1' } } : { status: 200, ok: true, results: [{ objectId: 'n0' }] })) }],
+      }),
+    );
+    const rx = new RX({ publishableKey: 'k' });
+    const b = await rx.post('/batch', { requests: [{ path: '/Notes', method: 'GET', body: { limit: 5 } }, { path: '/Plans', method: 'GET', body: { fields: '*', limit: -1 } }, { path: '/Plans/p1', method: 'GET' }] });
+    expect(b[0]).toEqual({ results: [{ objectId: 'n0' }] });
+    expect(b[1].results).toHaveLength(450);
+    expect(b[2]).toEqual({ results: [{ objectId: 'p1' }] });
+    const sent = calls.find((c) => c.path === '/batch').body.requests;
+    expect(sent.map((q) => q.path)).toEqual(['/Notes', '/Plans/p1']);
+    expect(calls.filter((c) => c.path === '/records/Plans').every((c) => /limit=200/.test(c.query))).toBe(true);
+  });
+
+  it('a batch of only limit -1 lists sends no /batch call', async () => {
+    const { RX, calls } = load(server());
+    const b = await new RX({ publishableKey: 'k' }).post('/batch', { requests: [{ path: '/records/Plans', method: 'GET', body: { limit: -1 } }] });
+    expect(b[0].results).toHaveLength(450);
+    expect(calls.some((c) => c.path === '/batch')).toBe(false);
+  });
+
   it('email-code sign-in: the user token is used afterwards; me() reads the own Users row; a dead user token signs out', async () => {
     let signedOut = 0;
     const user = jwt({ uid: 'u1', exp: 9999999999 });
