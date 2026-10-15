@@ -22,7 +22,7 @@
 
 ## Tooling
 
-- [@lmjs/cli](https://www.npmjs.com/package/@lmjs/cli) / [@lmjs/core](https://www.npmjs.com/package/@lmjs/core): `npm i -g @lmjs/cli`, then `lm create <name>` (add `--with-plugins` for a real-jQuery + 18-library bundle), `lm serve`, `lm build`.
+- [@lmjs/cli](https://www.npmjs.com/package/@lmjs/cli) / [@lmjs/core](https://www.npmjs.com/package/@lmjs/core): use **2.5.7** (required for V2) via `npx -y -p @lmjs/cli@2.5.7 lm <cmd>`; on an existing project run `lm update-core` before building. Then `lm create <name>` (add `--with-plugins` for a real-jQuery + 18-library bundle), `lm serve`, `lm build`.
 - Real npm imports work in `index.js`/project scripts (`npm install`, then `import`) — resolved at build time, zero cost if unused.
 - Secrets: `lm login`, then `lm api set/get/update/list/remove <name>` — never hand-write a credential into `config.json`.
 - Deploy: `roxyon init` then `roxyon deploy` (static) — see the Roxyon docs — or `lm build --deploy` via `config.json`'s `ftp` block.

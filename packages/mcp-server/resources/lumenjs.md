@@ -103,7 +103,8 @@ is NOT production — its "System (Apache) Page" strings contradict the real sta
 ### CLI commands (exhaustive, from the docs)
 
 ```bash
-npm i @lmjs/cli -g       # install the CLI
+npx -y -p @lmjs/cli@2.5.7 lm <cmd>   # run any command below with the required V2 CLI (2.5.7)
+lm update-core           # existing projects: sync src/js/lm.js to the CLI before building
 lm create My First Project  # scaffold a new project
 lm run                  # or: lm serve — dev server
 lm create -v myview      # scaffold a new top-level view

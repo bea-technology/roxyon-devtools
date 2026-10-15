@@ -5,6 +5,9 @@ import { type ProjectConfig, buildProjectConfig, saveProjectConfig } from '@roxy
 import { type FileOut, agentFiles } from './agent-files.js';
 import { type Template, baasOverlayFiles, nodeTemplateFiles } from './templates.js';
 
+// Pinned: an older lm.js runtime under a newer CLI builds with only a warning and breaks.
+export const LMJS_VERSION = '2.5.7';
+
 export interface ScaffoldInput {
   dir: string;
   name: string;
@@ -91,10 +94,14 @@ export async function scaffold(input: ScaffoldInput): Promise<ScaffoldResult> {
   if (input.template.viaLmjs) {
     // `lm create <name>` fills the CURRENT directory (the name is only used for
     // [ProjectName] substitution, not as a subdirectory).
-    const code = await run('npx', ['--yes', '@lmjs/cli', 'create', input.name], dir);
+    const code = await run(
+      'npx',
+      ['--yes', '-p', `@lmjs/cli@${LMJS_VERSION}`, 'lm', 'create', input.name],
+      dir,
+    );
     if (code !== 0 || !(await exists(join(dir, 'src', 'index.html')))) {
       throw new Error(
-        'Could not scaffold the LumenJS skeleton (npx @lmjs/cli create failed). Is npm online?',
+        `Could not scaffold the LumenJS skeleton (npx @lmjs/cli@${LMJS_VERSION} create failed). Is npm online?`,
       );
     }
 
@@ -104,7 +111,7 @@ export async function scaffold(input: ScaffoldInput): Promise<ScaffoldResult> {
         build: 'lm build --serverless',
         deploy: 'lm build --serverless && roxyon deploy',
       },
-      devDependencies: { '@lmjs/cli': '^1.0.51' },
+      devDependencies: { '@lmjs/cli': LMJS_VERSION },
     });
 
     if (input.template.baas) {

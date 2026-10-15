@@ -57,6 +57,19 @@ export type {
   AccountSubscription,
   AccountDomain,
 } from './account.js';
+export {
+  BaasDataApi,
+  BAAS_MAX_BATCH,
+  BAAS_MAX_PAGE,
+  DEFAULT_BAAS_V2_URL,
+} from './baas-data.js';
+export type {
+  BaasBatchRequest,
+  BaasBatchResult,
+  BaasDataOptions,
+  BaasQuery,
+  BaasRow,
+} from './baas-data.js';
 export { TokensApi } from './tokens.js';
 export type { TokenScope, TokenSummary, CreatedToken } from './tokens.js';
 export { RoxyonApiError, rxError, isAuthError, assertOk } from './errors.js';

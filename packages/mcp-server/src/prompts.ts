@@ -19,7 +19,7 @@ export function registerPrompts(server: McpServer): void {
           role: 'user',
           content: {
             type: 'text',
-            text: `Build a LumenJS single-page app: ${idea}\n\nSteps:\n1. Read the "roxyon://docs/lumenjs" resource — follow V1 rules exactly (one bind per region, no nested bind, build option lists in JS not :for, check every BaaS write for an error field).\n2. Read "roxyon://docs/baas" for the data/auth API.\n3. Scaffold with the LumenJS CLI: \`lm create <name>\`${dir ? ` in ${dir}` : ''}. Put views under src/views/, wire the BaaS in src/index.js via config.json.\n4. When it runs locally (\`lm serve\`), call roxyon_init then roxyon_deploy (dry run first, then confirm:true).`,
+            text: `Build a LumenJS single-page app: ${idea}\n\nSteps:\n1. Read the "roxyon://docs/lumenjs" resource — follow V1 rules exactly (one bind per region, no nested bind, build option lists in JS not :for, check every BaaS write for an error field).\n2. Read "roxyon://docs/baas" for the data/auth API.\n3. Scaffold with the LumenJS CLI 2.5.7: \`npx -y -p @lmjs/cli@2.5.7 lm create <name>\`${dir ? ` in ${dir}` : ''}. Put views under src/views/, wire the BaaS in src/index.js via config.json.\n4. When it runs locally (\`lm serve\`), call roxyon_init then roxyon_deploy (dry run first, then confirm:true).`,
           },
         },
       ],
