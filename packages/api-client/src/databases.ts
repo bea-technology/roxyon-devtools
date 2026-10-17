@@ -41,14 +41,18 @@ export interface DeleteDatabaseResult {
 export class DatabasesApi {
   constructor(private readonly client: RoxyonClient) {}
 
+  /** `POST /databases/list` — through the console, because PAT/OAuth callers can't read /Databases directly. */
   async list(subscriptionId: string): Promise<DatabaseSummary[]> {
-    const r = await this.client.get<{ results?: DatabaseSummary[] }>('/Databases', {
-      fields: 'objectId,Name,Username,Status',
-      limit: -1,
-      order: '-createdAt',
-      where: { Subscription: subscriptionId, eye: { in: '1,0' } },
+    const r = await this.client.console<{
+      ok?: boolean;
+      error?: string;
+      databases?: DatabaseSummary[];
+    }>('POST', '/databases/list', {
+      body: { subscription: subscriptionId },
+      tolerateHttpError: true,
     });
-    return r.results ?? [];
+    if (!r?.ok) throw new RoxyonApiError(r?.error || 'Could not list the databases.', { body: r });
+    return r.databases ?? [];
   }
 
   /** `POST /databases/create` — provision a database + user; the reconciler does the rest. */
