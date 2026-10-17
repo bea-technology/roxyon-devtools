@@ -44,14 +44,15 @@ export interface DeleteEmailResult {
 export class EmailApi {
   constructor(private readonly client: RoxyonClient) {}
 
+  /** `POST /emails/list` — through the console, because PAT/OAuth callers can't read /Emails directly. */
   async list(subscriptionId: string): Promise<EmailSummary[]> {
-    const r = await this.client.get<{ results?: EmailSummary[] }>('/Emails', {
-      fields: 'objectId,Email,LocalPart,Status,Quota',
-      limit: -1,
-      order: '-createdAt',
-      where: { Subscription: subscriptionId, eye: { in: '1,0' } },
-    });
-    return r.results ?? [];
+    const r = await this.client.console<{
+      ok?: boolean;
+      error?: string;
+      emails?: Omit<EmailSummary, 'LocalPart'>[];
+    }>('POST', '/emails/list', { body: { subscription: subscriptionId }, tolerateHttpError: true });
+    if (!r?.ok) throw new RoxyonApiError(r?.error || 'Could not list the mailboxes.', { body: r });
+    return (r.emails ?? []).map((e) => ({ ...e, LocalPart: e.Email.split('@')[0] ?? '' }));
   }
 
   /** `POST /emails/create` — provision a mailbox; the reconciler does the rest. */
