@@ -26,10 +26,13 @@ git commit -am "…" && git push
 ## 2. ✅ MCP registry
 
 `io.github.bea-technology/roxyon` is **active** on
-`registry.modelcontextprotocol.io` (currently `@roxyon/mcp@0.1.2`). GitHub OIDC
-auth — no credentials. Every release keeps it in sync via the "Update MCP
-registry" step in `release.yml`; manual re-run: Actions → "Publish to MCP
-Registry".
+`registry.modelcontextprotocol.io` (currently `@roxyon/mcp@0.7.0`, 2026-10-18). GitHub OIDC
+auth — no credentials. The "Update MCP registry" step in `release.yml` only runs when changesets
+reports a publish, and since npm releases wait for the owner's approval (staged trusted publishing)
+it no longer does: 0.5.0-0.7.0 never reached the registry until a manual run on 2026-10-18.
+**After approving an npm release of `@roxyon/mcp`, run Actions → "Publish to MCP Registry"**
+(`gh workflow run mcp-publish.yml -R bea-technology/roxyon-devtools`), then sync
+`integrations/mcp-registry/server.json` to the same version.
 
 Verify:
 ```bash
@@ -43,6 +46,11 @@ curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=roxyon" \
 
 **Auto-indexed from the MCP registry (step 2) — no action:** PulseMCP, mcp.so,
 Glama. They crawl the registry; allow a day or two.
+
+**awesome-mcp-servers / awesome-remote-mcp-servers:** PRs opened 2026-10-18:
+[punkpeye/awesome-mcp-servers#16796](https://github.com/punkpeye/awesome-mcp-servers/pull/16796) and
+[punkpeye/awesome-remote-mcp-servers#2115](https://github.com/punkpeye/awesome-remote-mcp-servers/pull/2115)
+(Glama connector `io.github.bea-technology/roxyon` already exists).
 
 **`modelcontextprotocol/servers` — nothing to do.** That repo
 [retired its third-party server list](https://github.com/modelcontextprotocol/servers/blob/main/CONTRIBUTING.md#server-listings)
