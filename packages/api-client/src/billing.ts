@@ -119,7 +119,14 @@ interface PlanRow {
   Limits?: unknown;
   Features?: unknown;
   _Service?: { results?: Array<{ Type?: string }> };
-  _Pricing?: { results?: Array<{ Prices?: unknown; SetupFee?: unknown; MetaData?: unknown }> };
+  _Pricing?: {
+    results?: Array<{
+      Prices?: unknown;
+      SetupFee?: unknown;
+      MetaData?: unknown;
+      IsActive?: unknown;
+    }>;
+  };
 }
 
 /**
@@ -143,7 +150,7 @@ export class BillingApi {
         {
           className: 'Pricing',
           field: 'Plan',
-          fields: 'Prices,SetupFee,MetaData',
+          fields: 'Prices,SetupFee,MetaData,IsActive',
           reverse: 1,
         },
       ],
@@ -154,18 +161,21 @@ export class BillingApi {
     const out: CatalogProduct[] = [];
     for (const p of r.results) {
       const pricing = p._Pricing?.results?.[0];
-      if (!pricing) continue;
+      // Same rule as roxyon.com's pricing page: a plan code, an active Pricing row, a monthly price.
+      if (!p.Code || !pricing || Number(pricing.IsActive) === 0) continue;
       const limits = json<Record<string, unknown>>(p.Limits, {});
       const features = json<Record<string, unknown>>(p.Features, {});
       const meta = json<Record<string, unknown>>(pricing.MetaData, {});
       const network = json<Record<string, unknown>>(features.Network, {});
       const setup = numbers(pricing.SetupFee);
+      const pricesUSD = numbers(pricing.Prices);
+      if (pricesUSD.monthly === undefined) continue;
       const product: CatalogProduct = {
         planId: p.objectId,
         sku: p.Code ?? '',
         name: p.Name ?? '',
         category: p._Service?.results?.[0]?.Type ?? '',
-        pricesUSD: numbers(pricing.Prices),
+        pricesUSD,
         stock: String(meta.stock ?? 'in').toLowerCase() === 'out' ? 'out' : 'in',
       };
       if (limits.vcpu != null) {
