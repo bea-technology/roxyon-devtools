@@ -1,6 +1,6 @@
 {
   "name": "@roxyon/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Deploy LumenJS apps and web projects to Roxyon infrastructure from anywhere — including AI assistants.",
   "license": "MIT",
   "type": "module",
