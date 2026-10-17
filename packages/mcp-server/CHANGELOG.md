@@ -1,5 +1,20 @@
 # @roxyon/mcp
 
+## 0.7.0
+
+### Minor Changes
+
+- 90f79d7: Database, mailbox and SSH-password tools are live: `roxyon_database_create`/`_delete`, `roxyon_list_databases`,
+  `roxyon_email_create`/`_delete`, `roxyon_list_emails`, `roxyon_ssh_reset_password` and `roxyon_install_wordpress`
+  are no longer hidden behind `ROXYON_MCP_PROVISIONING`. The two list calls now go through the console
+  (`POST /databases/list`, `/emails/list`), so they work with access tokens and OAuth connections.
+
+### Patch Changes
+
+- Updated dependencies [90f79d7]
+  - @roxyon/api-client@0.6.0
+  - @roxyon/deploy-core@0.3.3
+
 ## 0.6.0
 
 ### Minor Changes
