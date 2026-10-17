@@ -119,3 +119,30 @@ describe('BillingApi invoices', () => {
     expect(b?.payUrl).toBe(url);
   });
 });
+
+describe('BillingApi order', () => {
+  it('posts the order to the console with the PAT and surfaces refusals', async () => {
+    const { api, urls, headers } = setup(
+      () => ({ ok: false, error: 'Over budget: this order is 59.88 USD (before tax)' }),
+      'roxp_secret',
+    );
+    await expect(
+      api.order({ sku: 'SCALE-S', cycle: 'yearly', name: 'x', username: 'xy' }),
+    ).rejects.toThrow(/Over budget/);
+    expect(urls[0]?.pathname).toBe('/account/order');
+    expect(headers[0]?.authorization).toBe('Bearer roxp_secret');
+  });
+});
+
+describe('RoxyonClient', () => {
+  it('turns an HTML page (route not deployed) into a short error', async () => {
+    const client = new RoxyonClient({
+      sessionToken: 'roxp_x',
+      fetch: (async () => new Response('<!DOCTYPE html><html></html>')) as unknown as typeof fetch,
+    });
+    const r = await client.console<{ error?: string }>('POST', '/account/order', {
+      tolerateHttpError: true,
+    });
+    expect(r.error).toMatch(/not available on this server yet/);
+  });
+});

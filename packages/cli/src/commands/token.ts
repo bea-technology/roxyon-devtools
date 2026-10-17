@@ -2,11 +2,11 @@ import { RoxyonApiError, type TokenScope } from '@roxyon/api-client';
 import { requireSession } from '../context.js';
 import { EXIT, fail, ui } from '../ui.js';
 
-const SCOPES: TokenScope[] = ['deploy', 'logs', 'read'];
+const SCOPES: TokenScope[] = ['deploy', 'logs', 'read', 'billing:order'];
 
 export async function tokenCreate(
   name: string | undefined,
-  opts: { scopes?: string; expires?: number },
+  opts: { scopes?: string; expires?: number; budget?: number; skus?: string },
 ): Promise<void> {
   if (!name) fail('A name is required: roxyon token create <name>', EXIT.configError);
 
@@ -16,11 +16,21 @@ export async function tokenCreate(
   if (scopes.length === 0)
     fail(`--scopes must be a subset of: ${SCOPES.join(', ')}`, EXIT.configError);
 
+  const ordering = scopes.includes('billing:order');
+  if (ordering && !(opts.budget && opts.budget > 0))
+    fail('A billing:order token needs --budget <USD per month>', EXIT.configError);
+
   const { roxyon } = await requireSession();
   try {
     const t = await roxyon.tokens.create(name, {
       scopes,
       expiresInDays: opts.expires && opts.expires > 0 ? opts.expires : undefined,
+      ...(ordering
+        ? {
+            monthlyBudgetUSD: opts.budget,
+            allowedSkus: opts.skus ? opts.skus.split(',').map((x) => x.trim().toUpperCase()) : [],
+          }
+        : {}),
     });
     ui.success(
       `Created "${t.name}" (${t.scopes.join(', ')})${t.expiresAt ? ` · expires ${t.expiresAt.slice(0, 10)}` : ''}`,

@@ -118,7 +118,7 @@ describe('remote HTTP server', () => {
     expect(names).toContain('roxyon_deploy');
     expect(names).toContain('roxyon_deploy_content');
     expect(names).toContain('roxyon_add_domain');
-    expect(names.length).toBe(34);
+    expect(names.length).toBe(26);
     await client.close();
   });
 

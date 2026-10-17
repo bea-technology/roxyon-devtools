@@ -57,6 +57,9 @@ export type {
   BillingSubscription,
   CatalogProduct,
   Invoice,
+  OrderBudget,
+  OrderInput,
+  OrderResult,
   Quote,
   QuoteInput,
 } from './billing.js';

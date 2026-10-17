@@ -96,8 +96,12 @@ const token = program
 token
   .command('create <name>')
   .description('Create a token — prints the secret once')
-  .option('--scopes <list>', 'comma-separated: deploy,logs,read', 'deploy,logs')
+  .option('--scopes <list>', 'comma-separated: deploy,logs,read,billing:order', 'deploy,logs')
   .option('--expires <days>', 'expire after N days', (v) => Number.parseInt(v, 10))
+  .option('--budget <usd>', 'billing:order: most it may order per month, USD', (v) =>
+    Number.parseFloat(v),
+  )
+  .option('--skus <list>', 'billing:order: plan codes it may order, e.g. SCALE-S,LAUNCH-M')
   .action((name, opts) => run(() => tokenCreate(name, opts)));
 token
   .command('list')

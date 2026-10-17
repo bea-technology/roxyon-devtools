@@ -192,7 +192,15 @@ export class RoxyonClient {
     try {
       json = text ? JSON.parse(text) : {};
     } catch {
-      json = { error: text || `HTTP ${res.status}`, _raw: text };
+      // An HTML page means the route isn't served by the API (a console route not deployed yet falls through to
+      // the web app): say so instead of handing the page to the caller as an error message.
+      const html = /^\s*</.test(text);
+      json = {
+        error: html
+          ? `${method} ${path} is not available on this server yet (got a web page instead of the API).`
+          : text || `HTTP ${res.status}`,
+        _raw: html ? '' : text,
+      };
     }
 
     if (!res.ok && !opts.tolerateHttpError) {

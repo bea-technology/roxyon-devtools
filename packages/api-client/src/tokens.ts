@@ -1,7 +1,8 @@
 import type { RoxyonClient } from './client.js';
 import { RoxyonApiError } from './errors.js';
 
-export type TokenScope = 'deploy' | 'logs' | 'read';
+/** `billing:order` lets the token place orders (human pays) within its monthly budget; never a default. */
+export type TokenScope = 'deploy' | 'logs' | 'read' | 'billing:order';
 
 export interface TokenSummary {
   id: string;
@@ -11,6 +12,10 @@ export interface TokenSummary {
   lastUsedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
+  /** For `billing:order` tokens: the most it may order per calendar month, in USD before tax. */
+  monthlyBudgetUSD?: number | null;
+  /** For `billing:order` tokens: plan codes it may order (empty = any). */
+  allowedSkus?: string[];
 }
 
 export interface CreatedToken {
@@ -43,7 +48,13 @@ export class TokensApi {
 
   async create(
     name: string,
-    opts: { scopes?: TokenScope[]; expiresInDays?: number } = {},
+    opts: {
+      scopes?: TokenScope[];
+      expiresInDays?: number;
+      /** Required with `billing:order`. */
+      monthlyBudgetUSD?: number;
+      allowedSkus?: string[];
+    } = {},
   ): Promise<CreatedToken> {
     const r = await this.client.console<CreatedToken & { ok?: boolean; error?: string }>(
       'POST',
@@ -53,6 +64,8 @@ export class TokensApi {
           name,
           scopes: opts.scopes ?? ['deploy', 'logs'],
           ...(opts.expiresInDays ? { expiresInDays: opts.expiresInDays } : {}),
+          ...(opts.monthlyBudgetUSD ? { monthlyBudgetUSD: opts.monthlyBudgetUSD } : {}),
+          ...(opts.allowedSkus?.length ? { allowedSkus: opts.allowedSkus } : {}),
         },
         tolerateHttpError: true,
       },

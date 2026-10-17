@@ -20,8 +20,6 @@ describe('roxyon mcp server', () => {
       [
         'roxyon_add_domain',
         'roxyon_app_status',
-        'roxyon_database_create',
-        'roxyon_database_delete',
         'roxyon_baas_batch',
         'roxyon_baas_create',
         'roxyon_baas_delete',
@@ -35,22 +33,16 @@ describe('roxyon mcp server', () => {
         'roxyon_quote',
         'roxyon_deploy',
         'roxyon_deploy_content',
-        'roxyon_email_create',
-        'roxyon_email_delete',
         'roxyon_env_get',
         'roxyon_env_set',
         'roxyon_init',
-        'roxyon_install_wordpress',
         'roxyon_link_github',
         'roxyon_list_apps',
-        'roxyon_list_databases',
         'roxyon_list_domains',
-        'roxyon_list_emails',
         'roxyon_list_files',
         'roxyon_logs',
         'roxyon_read_file',
         'roxyon_restart',
-        'roxyon_ssh_reset_password',
         'roxyon_whoami',
       ].sort(),
     );
@@ -107,5 +99,20 @@ describe('roxyon mcp server', () => {
     expect(String((res.content as Array<{ text: string }>)[0]?.text)).toMatch(
       /roxyon\.json|not signed in/i,
     );
+  });
+});
+
+describe('gated tools', () => {
+  it('stay hidden until their backend is live', async () => {
+    const { tools } = await client.listTools();
+    const names = tools.map((t) => t.name);
+    for (const n of [
+      'roxyon_order',
+      'roxyon_database_create',
+      'roxyon_list_emails',
+      'roxyon_install_wordpress',
+    ]) {
+      expect(names, n).not.toContain(n);
+    }
   });
 });

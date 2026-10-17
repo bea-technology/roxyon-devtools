@@ -57,6 +57,45 @@ export interface Quote {
   baseAmountUSD: string;
 }
 
+export interface OrderInput {
+  /** Plan code from the catalog, e.g. `SCALE-S`. */
+  sku: string;
+  cycle: BillingCycle;
+  /** A name for the service. */
+  name: string;
+  /** Account / server name: 2-63 lowercase letters, digits, dots, dashes; must be free. */
+  username: string;
+  /** Servers only: OS image, e.g. `ubuntu-24.04`. */
+  image?: string;
+  sshKey?: string;
+  phpVersion?: string;
+  datacenter?: string;
+  currency?: string;
+  country?: string;
+  /** false/absent = dry run (quote + budget check, nothing written). */
+  confirm?: boolean;
+}
+
+export interface OrderBudget {
+  monthlyUSD: number;
+  spentUSD: number;
+  remainingUSD: number;
+}
+
+export interface OrderResult {
+  dryRun?: boolean;
+  plan: { id: string; sku: string; name: string; kind: 'hosting' | 'server'; cycle: string };
+  /** Dry run: the server quote (same shape as GET /_payment/quote). */
+  quote?: Record<string, unknown>;
+  subscriptionId?: string;
+  invoiceId?: string;
+  total?: string;
+  currency?: string;
+  payUrl?: string;
+  /** null for a console session (no token budget). */
+  budget: OrderBudget | null;
+}
+
 export interface BillingSubscription {
   id: string;
   name: string;
@@ -229,6 +268,19 @@ export class BillingApi {
       fxRate: String(r.fxRate ?? ''),
       baseAmountUSD: String(r.baseAmount ?? ''),
     };
+  }
+
+  /**
+   * A new order for the caller (POST /account/order): dry run unless `confirm`. The engine prices and creates it
+   * (Subscription in payment + pending invoice); a person pays at `payUrl`. Needs a session or a PAT with the
+   * `billing:order` scope, within that token's monthly budget and allowed SKUs.
+   */
+  async order(input: OrderInput): Promise<OrderResult> {
+    const r = await this.client.console<
+      Partial<OrderResult> & { ok?: boolean; error?: string; budget?: OrderBudget }
+    >('POST', '/account/order', { body: input, tolerateHttpError: true });
+    if (!r?.ok) throw new RoxyonApiError(r?.error || 'The order was not placed.', { body: r });
+    return r as OrderResult;
   }
 
   /** The caller's own subscriptions (rows they own), newest first. */

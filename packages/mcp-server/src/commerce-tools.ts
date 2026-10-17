@@ -205,4 +205,86 @@ export function registerCommerceTools(server: McpServer): void {
         );
       }),
   );
+
+  const order = server.registerTool(
+    'roxyon_order',
+    {
+      title: 'Roxyon: place an order (a person pays)',
+      description:
+        'Order a new web-hosting plan or cloud server for the signed-in user. The platform prices it ' +
+        'and creates the subscription and a pending invoice; a PERSON then pays at the returned payUrl ' +
+        '(nothing is charged by this tool, and the service is set up only after payment). ' +
+        'Always call it first WITHOUT confirm: that dry run returns the exact quote and the token budget ' +
+        'and writes nothing. Show it to the user, then call again with confirm:true. ' +
+        'Rules: `sku` from roxyon_catalog (out-of-stock plans are refused); servers need `image` ' +
+        '(e.g. "ubuntu-24.04"); `username` must be free. Needs a sign-in, or a token created with the ' +
+        '"billing:order" scope (`roxyon token create <name> --scopes billing:order --budget <USD> ' +
+        '[--skus SCALE-S,…]`): it is refused past that monthly budget (USD, before tax) or outside its SKUs.',
+      inputSchema: {
+        sku: z.string().describe('Plan code from roxyon_catalog, e.g. "SCALE-S".'),
+        cycle: z.enum(BILLING_CYCLES),
+        name: z.string().min(1).max(100).describe('A name for the service.'),
+        username: z
+          .string()
+          .regex(/^[a-z0-9][a-z0-9.-]{1,62}$/)
+          .describe('Account/server name: lowercase letters, digits, dots, dashes; must be free.'),
+        image: z.string().optional().describe('Servers only: OS image, e.g. "ubuntu-24.04".'),
+        ssh_key: z.string().optional().describe('Servers only: an SSH public key for root.'),
+        php_version: z.string().optional().describe('Hosting only, e.g. "8.3".'),
+        currency: z.string().length(3).optional(),
+        country: z.string().length(2).optional().describe('Decides tax, e.g. "SA".'),
+        confirm: z.boolean().optional(),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        const r = await session.roxyon.billing.order({
+          sku: args.sku,
+          cycle: args.cycle,
+          name: args.name,
+          username: args.username,
+          image: args.image,
+          sshKey: args.ssh_key,
+          phpVersion: args.php_version,
+          currency: args.currency,
+          country: args.country,
+          confirm: args.confirm === true,
+        });
+        const budget = r.budget
+          ? `Token budget: ${r.budget.spentUSD.toFixed(2)} of ${r.budget.monthlyUSD.toFixed(2)} USD used this month, ${r.budget.remainingUSD.toFixed(2)} left.`
+          : '';
+        if (r.dryRun) {
+          const q = (r.quote ?? {}) as {
+            total?: string;
+            currency?: string;
+            taxAmount?: string;
+            taxLabel?: string;
+          };
+          return text(
+            [
+              `Dry run, nothing ordered: ${r.plan.sku} "${r.plan.name}" (${r.plan.kind}), ${r.plan.cycle}.`,
+              `Total ${q.total} ${q.currency} (incl. ${q.taxLabel || 'tax'} ${q.taxAmount}).`,
+              budget,
+              'Call again with confirm:true to place it; a person then pays the invoice.',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            { ...r },
+          );
+        }
+        return text(
+          [
+            `Ordered ${r.plan.sku} "${r.plan.name}" (${r.plan.cycle}): invoice ${r.invoiceId}, ${r.total} ${r.currency}.`,
+            `Not active until paid. The user pays at ${r.payUrl}.`,
+            budget,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          { ...r },
+        );
+      }),
+  );
+  // Hidden until the console's POST /account/order and the V2 user-session mint are live.
+  if (process.env.ROXYON_MCP_ORDERING !== '1') order.disable();
 }
