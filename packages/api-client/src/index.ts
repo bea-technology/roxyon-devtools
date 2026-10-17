@@ -51,7 +51,7 @@ export { SshApi } from './ssh.js';
 export type { ResetSshPasswordInput, ResetSshPasswordResult } from './ssh.js';
 export { SubscriptionsApi } from './subscriptions.js';
 export type { Subscription, Privilege } from './subscriptions.js';
-export { BillingApi, BILLING_CYCLES } from './billing.js';
+export { BillingApi, BILLING_CYCLES, PAYABLE_STATUSES, isPayable } from './billing.js';
 export type {
   BillingCycle,
   BillingSubscription,

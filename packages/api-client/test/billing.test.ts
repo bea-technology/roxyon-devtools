@@ -100,3 +100,22 @@ describe('BillingApi', () => {
     expect(urls).toHaveLength(0);
   });
 });
+
+describe('BillingApi invoices', () => {
+  it('drops the pay link from invoices that cannot be paid', async () => {
+    const url = 'https://console.roxyon.com/account/invoices';
+    const { api } = setup(
+      () => ({
+        ok: true,
+        invoices: [
+          { id: 'a', status: 'void', payUrl: url },
+          { id: 'b', status: 'pending', payUrl: url },
+        ],
+      }),
+      'roxp_x',
+    );
+    const [a, b] = await api.invoices();
+    expect(a?.payUrl).toBeNull();
+    expect(b?.payUrl).toBe(url);
+  });
+});

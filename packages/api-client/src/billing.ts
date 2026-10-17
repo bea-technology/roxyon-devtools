@@ -85,6 +85,13 @@ export interface Invoice {
   payUrl: string | null;
 }
 
+/** Invoice statuses a customer can still pay. */
+export const PAYABLE_STATUSES = ['pending', 'overdue', 'failed'] as const;
+
+export function isPayable(status: string): boolean {
+  return (PAYABLE_STATUSES as readonly string[]).includes(status.toLowerCase());
+}
+
 function json<T>(v: unknown, fallback: T): T {
   if (v && typeof v === 'object') return v as T;
   if (typeof v !== 'string' || v === '') return fallback;
@@ -236,6 +243,7 @@ export class BillingApi {
       { tolerateHttpError: true, query: q },
     );
     if (!r?.ok) throw new RoxyonApiError(r?.error || 'Could not load invoices.', { body: r });
-    return r.invoices ?? [];
+    // Only an open invoice can be paid (the first console release also linked void ones).
+    return (r.invoices ?? []).map((i) => ({ ...i, payUrl: isPayable(i.status) ? i.payUrl : null }));
   }
 }

@@ -167,4 +167,42 @@ export function registerCommerceTools(server: McpServer): void {
         return text(body, { invoices });
       }),
   );
+
+  server.registerTool(
+    'roxyon_pay_link',
+    {
+      title: 'Roxyon: where to pay an invoice',
+      description:
+        'The URL where the signed-in user pays one of their own open invoices (status pending, ' +
+        'overdue or failed), plus its amount and due date. Give the invoice number (e.g. ' +
+        '"INV2610055") or id from roxyon_list_invoices. A human opens the link and pays in the ' +
+        'console; this tool never charges anything. Paid or void invoices have no link.',
+      inputSchema: {
+        invoice: z.string().min(1).max(40).describe('Invoice number or id.'),
+      },
+    },
+    (args) =>
+      guard(async () => {
+        const session = await getSession();
+        const want = args.invoice.replace(/^#/, '').toLowerCase();
+        const inv = (await session.roxyon.billing.invoices({ limit: 100 })).find(
+          (i) => i.id.toLowerCase() === want || i.number.toLowerCase() === want,
+        );
+        if (!inv) {
+          throw new Error(
+            `No invoice "${args.invoice}" among your latest 100. See roxyon_list_invoices.`,
+          );
+        }
+        if (!inv.payUrl) {
+          return text(`Invoice #${inv.number || inv.id} is ${inv.status}: nothing to pay.`, {
+            invoice: inv,
+          });
+        }
+        return text(
+          `Invoice #${inv.number || inv.id}: ${inv.total} ${inv.currency}, due ${inv.dueDate ?? '—'}.\n` +
+            `Pay at ${inv.payUrl} (sign in, open Invoices, choose this invoice).`,
+          { invoice: inv, payUrl: inv.payUrl },
+        );
+      }),
+  );
 }

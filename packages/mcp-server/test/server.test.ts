@@ -31,6 +31,7 @@ describe('roxyon mcp server', () => {
         'roxyon_catalog',
         'roxyon_list_invoices',
         'roxyon_list_subscriptions',
+        'roxyon_pay_link',
         'roxyon_quote',
         'roxyon_deploy',
         'roxyon_deploy_content',
