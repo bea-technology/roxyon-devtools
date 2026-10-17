@@ -1,5 +1,16 @@
 # @roxyon/api-client
 
+## 0.4.0
+
+### Minor Changes
+
+- d516b4e: Add BaaS V2 data tools for the user's own app: `roxyon_baas_query`, `roxyon_baas_get`, `roxyon_baas_create`, `roxyon_baas_update`, `roxyon_baas_delete` and `roxyon_baas_batch`. They call `https://www.beaapis.com/2` (`/records`, `/batch`) as the app's backend with the secret key `RX_SECRET_KEY` (`rxsk_…`) from the project's `.env`, and run in the local (stdio) server only. Writes need `confirm:true`. New `BaasDataApi` in `@roxyon/api-client`.
+- 1b42ced: Add read-only commerce tools: `roxyon_catalog` (public products with specs, USD list prices per cycle and stock), `roxyon_quote` (the exact checkout total for a new subscription, from the platform's own pricing, in the buyer's currency and tax), `roxyon_list_subscriptions` and `roxyon_list_invoices` (the caller's own, via the console's new `/account/subscriptions` and `/account/invoices`). Catalog and quote need no sign-in. New `BillingApi` in `@roxyon/api-client`.
+
+### Patch Changes
+
+- 90d6559: Add `roxyon_pay_link` (the console URL where the user pays one of their own open invoices; never charges). Invoices that can't be paid (paid, void, cancelled) no longer carry a pay link. New `isPayable()` / `PAYABLE_STATUSES` in `@roxyon/api-client`.
+
 ## 0.3.0
 
 ### Minor Changes
