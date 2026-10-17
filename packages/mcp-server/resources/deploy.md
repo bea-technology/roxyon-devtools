@@ -24,6 +24,7 @@ Written by `roxyon_init` at the project root:
   "kind": "static",               // static (lumen) | app
   "build": "lm build --serverless",
   "outDir": "dist",
+  "spa": true,                    // static kind only — unknown paths serve /index.html
   "start": "npm run start",       // app kind only
   "public": true                  // app kind only — serve the app on the host
 }
@@ -35,7 +36,7 @@ Written by `roxyon_init` at the project root:
 2. Run `build` if set (LumenJS → `lm build --serverless`).
 3. Archive the project (or `outDir`) minus `node_modules`, `.git`, build caches,
    and `.roxyonignore` / `.gitignore` matches. The archive is deterministic.
-4. **static** → `POST /sites/deploy` (host + folder + tarball).
+4. **static** → `POST /sites/deploy` (host + folder + tarball; `?spa=1` when `spa` is true).
    **app** → create the `Applications` / `ApplicationProcesses` /
    `ApplicationRoutes` rows on the first deploy, then `POST /applications/deploy`
    (tarball) which lands it in `SourcePath` and bumps `ConfigRevision`.

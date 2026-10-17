@@ -132,7 +132,9 @@ export async function deployProject(params: DeployParams): Promise<DeployOutcome
     reporter?.step?.(`Uploading to ${config.host}${config.folder ? `/${config.folder}` : ''}`);
     let res: Awaited<ReturnType<typeof roxyon.sites.deploy>>;
     try {
-      res = await roxyon.sites.deploy(config.host, config.folder, pack.buffer);
+      res = await roxyon.sites.deploy(config.host, config.folder, pack.buffer, {
+        spa: config.spa === true,
+      });
     } catch (err) {
       throw new DeployError(
         err instanceof RoxyonApiError ? err.message : String(err),

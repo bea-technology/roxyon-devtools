@@ -24,6 +24,12 @@ export interface ProjectConfig {
   start?: string;
   /** Serve the app on the host instead of the host's own files. */
   public?: boolean;
+  /**
+   * Static kind only: single-page routing, so paths with no file (`/about`) serve
+   * `/index.html` instead of a 404. Sent as `?spa=1` on every static deploy; the
+   * console sets the host's site type, so it sticks once applied.
+   */
+  spa?: boolean;
 }
 
 export const PROJECT_FILE = 'roxyon.json';
