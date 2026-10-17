@@ -1,5 +1,15 @@
 # @roxyon/api-client
 
+## 0.5.0
+
+### Minor Changes
+
+- 0e6ccd0: Agent ordering: `roxyon_order` places a new hosting plan or cloud server for the signed-in user (dry run first with the exact quote and the token's budget, `confirm:true` to place it); the platform creates the subscription and a pending invoice, and a person pays at the returned link. Nothing is charged by the tool. Tokens made with the new `billing:order` scope carry a monthly USD budget and an optional SKU allow-list (`roxyon token create <name> --scopes billing:order --budget 50 --skus LAUNCH-S`), enforced server-side. New `BillingApi.order()` in `@roxyon/api-client`. The tool is hidden unless the server sets `ROXYON_MCP_ORDERING=1`.
+
+### Patch Changes
+
+- 7e55387: `BillingApi.catalog()` lists exactly what roxyon.com sells: plans with a code, an active Pricing row and a monthly price.
+
 ## 0.4.0
 
 ### Minor Changes
