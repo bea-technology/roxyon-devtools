@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerBaasTools } from './baas-tools.js';
+import { registerCommerceTools } from './commerce-tools.js';
 import { registerPrompts } from './prompts.js';
 import { registerResources } from './resources.js';
 import { registerTools } from './tools.js';
@@ -27,5 +28,6 @@ export function createServer(): McpServer {
   registerPrompts(server);
   registerTools(server);
   registerBaasTools(server);
+  registerCommerceTools(server);
   return server;
 }

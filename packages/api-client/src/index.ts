@@ -1,6 +1,7 @@
 import { AccountApi } from './account.js';
 import { ApplicationsApi } from './applications.js';
 import { AuthApi } from './auth.js';
+import { BillingApi } from './billing.js';
 import { RoxyonClient, type RoxyonClientOptions } from './client.js';
 import { DatabasesApi } from './databases.js';
 import { DomainsApi } from './domains.js';
@@ -50,6 +51,15 @@ export { SshApi } from './ssh.js';
 export type { ResetSshPasswordInput, ResetSshPasswordResult } from './ssh.js';
 export { SubscriptionsApi } from './subscriptions.js';
 export type { Subscription, Privilege } from './subscriptions.js';
+export { BillingApi, BILLING_CYCLES } from './billing.js';
+export type {
+  BillingCycle,
+  BillingSubscription,
+  CatalogProduct,
+  Invoice,
+  Quote,
+  QuoteInput,
+} from './billing.js';
 export { AccountApi } from './account.js';
 export type {
   AccountApp,
@@ -99,6 +109,7 @@ export class Roxyon {
   readonly databases: DatabasesApi;
   readonly email: EmailApi;
   readonly ssh: SshApi;
+  readonly billing: BillingApi;
 
   constructor(options: RoxyonClientOptions | RoxyonClient = {}) {
     this.client = options instanceof RoxyonClient ? options : new RoxyonClient(options);
@@ -112,6 +123,7 @@ export class Roxyon {
     this.databases = new DatabasesApi(this.client);
     this.email = new EmailApi(this.client);
     this.ssh = new SshApi(this.client);
+    this.billing = new BillingApi(this.client);
   }
 
   get sessionToken(): string | undefined {

@@ -68,6 +68,18 @@ export class RoxyonClient {
     }
   }
 
+  /** Same endpoints and app, no user credentials: for public reads (catalog, quotes)
+   * that must work for PAT callers too, whose token the BaaS does not accept. */
+  publicClient(): RoxyonClient {
+    return new RoxyonClient({
+      baseUrl: this.baseUrl,
+      consoleUrl: this.consoleUrl,
+      appId: this.appId,
+      javascriptKey: this.javascriptKey,
+      fetch: this._fetch,
+    });
+  }
+
   getSessionToken(): string | undefined {
     return this.sessionToken;
   }
