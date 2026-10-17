@@ -15,6 +15,7 @@ Per-project config, at the project root. Written by `roxyon init`; the
   "kind": "static",                  // static (lumen) | app (node/python/php)
   "build": "lm build --serverless",  // local build command; "" for server runtimes
   "outDir": "dist",                  // where the build writes (static kind)
+  "spa": true,                       // single-page routing: unknown paths serve /index.html (static kind)
   "start": "npm run start",          // web-process start command (app kind)
   "public": true                     // serve the app on the host (app kind)
 }
