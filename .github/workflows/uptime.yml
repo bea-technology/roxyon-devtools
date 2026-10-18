@@ -1,0 +1,36 @@
+name: Uptime
+
+# External uptime check: runs on GitHub's machines, outside Roxyon, so it still alerts when
+# lb-1 or the whole private network is down. State lives in the open `outage` issue only.
+# See tools/uptime/README.md.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: tools/uptime
+      - name: Check services
+        # exit 1 = something is down (handled below); any other non-zero = the check itself broke
+        run: tools/uptime/check.sh > down.txt || [ $? -eq 1 ]
+      - name: Open, update or close the outage issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          UPTIME_MENTION: ${{ vars.UPTIME_MENTION }}
+        run: tools/uptime/notify.sh down.txt
