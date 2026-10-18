@@ -50,7 +50,9 @@ Glama. They crawl the registry; allow a day or two.
 **awesome-mcp-servers / awesome-remote-mcp-servers:** PRs opened 2026-10-18:
 [punkpeye/awesome-mcp-servers#16796](https://github.com/punkpeye/awesome-mcp-servers/pull/16796) and
 [punkpeye/awesome-remote-mcp-servers#2115](https://github.com/punkpeye/awesome-remote-mcp-servers/pull/2115)
-(Glama connector `io.github.bea-technology/roxyon` already exists).
+(Glama connector `io.github.bea-technology/roxyon` already exists). #2115 passes its checks. #16796 needs the repo listed as a
+Glama *server* (sign in at https://glama.ai/mcp/servers, add a Dockerfile there so it starts and answers introspection),
+then a score badge `[![bea-technology/roxyon-devtools MCP server](https://glama.ai/mcp/servers/bea-technology/roxyon-devtools/badges/score.svg)](https://glama.ai/mcp/servers/bea-technology/roxyon-devtools)` added to the PR line.
 
 **`modelcontextprotocol/servers` — nothing to do.** That repo
 [retired its third-party server list](https://github.com/modelcontextprotocol/servers/blob/main/CONTRIBUTING.md#server-listings)
