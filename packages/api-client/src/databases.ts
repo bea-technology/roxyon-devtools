@@ -8,11 +8,20 @@ export interface CreateDatabaseInput {
   subscription?: string;
   /** Omit to have the platform generate one. */
   password?: string;
+  /**
+   * `mysql` (default: MySQL/MariaDB on the shared cluster) or `postgres` (PostgreSQL 15 inside the account's own hosting
+   * container, at localhost:5432; the first one installs it, a few minutes). Every hosting account has both.
+   */
+  engine?: 'mysql' | 'postgres';
 }
 
 export interface CreateDatabaseResult {
   ok: boolean;
   objectId: string;
+  engine?: 'mysql' | 'postgres';
+  port?: number;
+  /** How to connect (PostgreSQL: the URL shape and the no-password psql login over SSH). */
+  note?: string;
   name: string;
   username: string;
   /** Shown once — not retrievable afterwards. */
@@ -28,6 +37,8 @@ export interface DatabaseSummary {
   Name: string;
   Username: string;
   Status: string;
+  /** `postgres` for PostgreSQL; empty or `mysql` for MySQL/MariaDB. */
+  Engine?: string;
 }
 
 export interface DeleteDatabaseResult {
@@ -37,7 +48,7 @@ export interface DeleteDatabaseResult {
   error?: string;
 }
 
-/** Databases (MySQL/MariaDB on the shared Galera cluster) attached to a subscription. */
+/** Databases attached to a subscription: MySQL/MariaDB (shared Galera cluster) or PostgreSQL (in the account's container). */
 export class DatabasesApi {
   constructor(private readonly client: RoxyonClient) {}
 

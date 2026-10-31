@@ -709,13 +709,16 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Roxyon: create a database',
       description:
-        "Provision a MySQL/MariaDB database + user. The name is prefixed with the account's own " +
-        'username (globally unique across the shared cluster) — pass just the suffix, e.g. "wordpress". ' +
-        'The password is shown once in the result; there is no way to retrieve it later. Needs confirm:true.',
+        'Provision a database + user on a Roxyon hosting account: engine "mysql" (MySQL/MariaDB, default) or "postgres" ' +
+        '(PostgreSQL 15 inside the account, localhost:5432; the first one installs it in a few minutes). Every hosting ' +
+        'account has both: no VPS is needed for PostgreSQL. The name is prefixed with the account\'s own username — pass ' +
+        'just the suffix, e.g. "wordpress". The password is shown once in the result; there is no way to retrieve it later. ' +
+        'Needs confirm:true.',
       inputSchema: {
         name: z.string().describe('DB name suffix: lowercase letters, digits, underscore.'),
         subscription: z.string().optional(),
         password: z.string().optional().describe('Omit to have Roxyon generate one.'),
+        engine: z.enum(['mysql', 'postgres']).optional().describe('mysql (default) or postgres.'),
         confirm: z.boolean().optional(),
       },
     },
@@ -723,7 +726,7 @@ export function registerTools(server: McpServer): void {
       guard(async () => {
         const session = await getSession();
         if (!args.confirm) {
-          return text(`Would create database "${args.name}". Pass confirm:true.`, {
+          return text(`Would create ${args.engine === 'postgres' ? 'PostgreSQL' : 'MySQL'} database "${args.name}". Pass confirm:true.`, {
             dryRun: true,
           });
         }
@@ -731,11 +734,14 @@ export function registerTools(server: McpServer): void {
           name: args.name,
           subscription: args.subscription ?? session.preferredSubscription,
           password: args.password,
+          ...(args.engine ? { engine: args.engine } : {}),
         });
+        const pg = r.engine === 'postgres';
         const body = [
-          `${r.status === 'active' ? '✓' : '»'} Database ${r.name} (user ${r.username}) — ${r.status}.`,
+          `${r.status === 'active' ? '✓' : '»'} ${pg ? 'PostgreSQL' : 'MySQL'} database ${r.name} (user ${r.username}) — ${r.status}.`,
           r.password ? `\nPassword (save this now — shown once):\n${r.password}` : '',
-          r.host ? `Host: ${r.host}` : '',
+          r.host ? `Host: ${r.host}${r.port ? `:${r.port}` : ''}` : '',
+          r.note ?? '',
         ]
           .filter(Boolean)
           .join('\n');
@@ -744,7 +750,9 @@ export function registerTools(server: McpServer): void {
           objectId: r.objectId,
           name: r.name,
           username: r.username,
+          engine: r.engine ?? 'mysql',
           host: r.host,
+          port: r.port,
           status: r.status,
         });
       }),
@@ -766,7 +774,7 @@ export function registerTools(server: McpServer): void {
         const rows = await session.roxyon.databases.list(subscription);
         const body = rows.length
           ? rows
-              .map((d) => `- ${d.Name} [${d.objectId}] — ${d.Status} (user ${d.Username})`)
+              .map((d) => `- ${d.Name} [${d.objectId}] — ${d.Engine === 'postgres' ? 'PostgreSQL' : 'MySQL'}, ${d.Status} (user ${d.Username})`)
               .join('\n')
           : '(no databases)';
         return text(body, { databases: rows });
