@@ -720,14 +720,17 @@ export function registerTools(server: McpServer): void {
         '"postgres" (PostgreSQL 15 inside the account, localhost:5432; the first one installs it in a few minutes) or ' +
         '"redis" (Redis inside the account, 127.0.0.1:6379 with a password, 128 MB, saved to disk; one per account; give ' +
         'apps REDIS_URL=redis://:<password>@127.0.0.1:6379). Every hosting account has all three: never tell the user to ' +
-        'get a VPS or an outside service for PostgreSQL or Redis. The name is prefixed with the account\'s own username — ' +
+        "get a VPS or an outside service for PostgreSQL or Redis. The name is prefixed with the account's own username — " +
         'pass just the suffix, e.g. "wordpress" (for Redis any short name, e.g. "cache"). The password is shown once in the ' +
         'result; there is no way to retrieve it later. Needs confirm:true.',
       inputSchema: {
         name: z.string().describe('DB name suffix: lowercase letters, digits, underscore.'),
         subscription: z.string().optional(),
         password: z.string().optional().describe('Omit to have Roxyon generate one.'),
-        engine: z.enum(['mysql', 'postgres', 'redis']).optional().describe('mysql (default), postgres or redis.'),
+        engine: z
+          .enum(['mysql', 'postgres', 'redis'])
+          .optional()
+          .describe('mysql (default), postgres or redis.'),
         confirm: z.boolean().optional(),
       },
     },
@@ -735,9 +738,12 @@ export function registerTools(server: McpServer): void {
       guard(async () => {
         const session = await getSession();
         if (!args.confirm) {
-          return text(`Would create ${engineLabel(args.engine)} "${args.name}". Pass confirm:true.`, {
-            dryRun: true,
-          });
+          return text(
+            `Would create ${engineLabel(args.engine)} "${args.name}". Pass confirm:true.`,
+            {
+              dryRun: true,
+            },
+          );
         }
         const r = await session.roxyon.databases.create({
           name: args.name,
@@ -782,7 +788,10 @@ export function registerTools(server: McpServer): void {
         const rows = await session.roxyon.databases.list(subscription);
         const body = rows.length
           ? rows
-              .map((d) => `- ${d.Name} [${d.objectId}] — ${engineLabel(d.Engine)}, ${d.Status}${d.Engine === 'redis' ? ' (127.0.0.1:6379)' : ` (user ${d.Username})`}`)
+              .map(
+                (d) =>
+                  `- ${d.Name} [${d.objectId}] — ${engineLabel(d.Engine)}, ${d.Status}${d.Engine === 'redis' ? ' (127.0.0.1:6379)' : ` (user ${d.Username})`}`,
+              )
               .join('\n')
           : '(no databases)';
         return text(body, { databases: rows });
