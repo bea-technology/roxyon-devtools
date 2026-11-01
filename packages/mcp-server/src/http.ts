@@ -7,6 +7,7 @@ import {
 import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Express } from 'express';
+import { loadAccountTools } from './account-tools.js';
 import { runWithContext } from './context.js';
 import {
   type AuthServerMetadata,
@@ -152,6 +153,10 @@ export async function startHttpServer(cfg: HttpConfig = configFromEnv()): Promis
       ? await fetchAuthServerMetadata(cfg.oauthIssuer)
       : staticAuthServerMetadata(cfg.oauthIssuer);
 
+  // Roxyon AI's account tools (D-20261101-41): loaded before serving, refreshed every 10 minutes.
+  const accountTools = await loadAccountTools(process.env);
+  setInterval(() => void loadAccountTools(process.env), 10 * 60_000).unref();
+
   const app = buildApp(cfg, oauthMetadata);
   await new Promise<void>((resolve, reject) => {
     const srv = app.listen(cfg.port, cfg.host, () => resolve());
@@ -159,6 +164,6 @@ export async function startHttpServer(cfg: HttpConfig = configFromEnv()): Promis
   });
   process.stderr.write(
     `roxyon-mcp: HTTP on ${cfg.host}:${cfg.port} — resource ${cfg.publicUrl}/mcp, ` +
-      `auth=${cfg.authMode}, issuer=${cfg.oauthIssuer}\n`,
+      `auth=${cfg.authMode}, issuer=${cfg.oauthIssuer}, account tools=${accountTools}\n`,
   );
 }

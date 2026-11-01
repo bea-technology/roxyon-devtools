@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { registerAccountTools } from './account-tools.js';
 import { registerBaasTools } from './baas-tools.js';
 import { registerCommerceTools } from './commerce-tools.js';
 import { registerPrompts } from './prompts.js';
@@ -25,7 +26,13 @@ export function createServer(): McpServer {
         '"mysql" | "postgres" | "redis"), mailboxes, domains with free SSL, Node/PHP apps, env vars, logs and SSH: never ' +
         'send the user to a VPS or an outside service for any of these. If something the user asks for has no tool here, ' +
         'say exactly which step is missing and that it can be done in the Roxyon Console or by Roxyon AI there ' +
-        '(console.roxyon.com/agent); never invent a workaround or claim it is impossible on Roxyon.',
+        '(console.roxyon.com/agent); never invent a workaround or claim it is impossible on Roxyon. ' +
+        'Besides the deploy tools, the remote connector offers the same account tools Roxyon AI uses in the console, acting ' +
+        'as the signed-in user with their permissions: site files (read, write, move, delete), site_tools (cron jobs, PHP ' +
+        'settings, permissions, zip/unzip, search), run_in_site (a shell command in their hosting), DNS records, SSL, ' +
+        'mailboxes, forwarding and auto-replies, databases (export, restore, SQL), nightly backups and restores, cloud ' +
+        'servers (start/stop/restart, root password, firewall), plans, invoices and payments, Roxyon Base, newsletters, ' +
+        "Engage and social posts. Actions that change something need the user's explicit yes first (confirmed: true).",
     },
   );
 
@@ -34,5 +41,12 @@ export function createServer(): McpServer {
   registerTools(server);
   registerBaasTools(server);
   registerCommerceTools(server);
+  // Roxyon AI's account tools (remote server only; the list is loaded at boot). The connector's own tools keep their names.
+  const taken = new Set(
+    Object.keys(
+      (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools,
+    ),
+  );
+  registerAccountTools(server, taken);
   return server;
 }
