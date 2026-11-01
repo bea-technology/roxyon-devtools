@@ -64,6 +64,15 @@ describe('roxyon mcp server', () => {
     }
   });
 
+  it('offers MySQL, PostgreSQL and Redis on hosting, and says so', async () => {
+    const { tools } = await client.listTools();
+    const create = tools.find((t) => t.name === 'roxyon_database_create');
+    const engine = (create?.inputSchema.properties as Record<string, { enum?: string[] }>).engine;
+    expect(engine?.enum).toEqual(['mysql', 'postgres', 'redis']);
+    expect(create?.description).toContain('never tell the user to get a VPS');
+    expect(client.getInstructions()).toContain('MySQL, PostgreSQL and Redis');
+  });
+
   it('serves the doc resources', async () => {
     const { resources } = await client.listResources();
     const uris = resources.map((r) => r.uri).sort();

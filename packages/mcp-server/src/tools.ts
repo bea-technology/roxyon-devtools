@@ -30,6 +30,13 @@ const MAX_TOTAL_BYTES = 2 * 1024 * 1024;
  * directory — impossible over the remote HTTP server. Returns an explanatory
  * result when running in that mode, `null` otherwise (proceed).
  */
+/** A data store's engine as people say it (rows with no Engine are MySQL). */
+function engineLabel(engine?: string | null): string {
+  if (engine === 'postgres') return 'PostgreSQL database';
+  if (engine === 'redis') return 'Redis';
+  return 'MySQL database';
+}
+
 function remoteFilesystemBlock(
   tool: 'roxyon_init' | 'roxyon_deploy' | 'roxyon_install_wordpress',
 ): ToolResult | null {
@@ -707,18 +714,20 @@ export function registerTools(server: McpServer): void {
   server.registerTool(
     'roxyon_database_create',
     {
-      title: 'Roxyon: create a database',
+      title: 'Roxyon: create a database (MySQL, PostgreSQL or Redis)',
       description:
-        'Provision a database + user on a Roxyon hosting account: engine "mysql" (MySQL/MariaDB, default) or "postgres" ' +
-        '(PostgreSQL 15 inside the account, localhost:5432; the first one installs it in a few minutes). Every hosting ' +
-        'account has both: no VPS is needed for PostgreSQL. The name is prefixed with the account\'s own username — pass ' +
-        'just the suffix, e.g. "wordpress". The password is shown once in the result; there is no way to retrieve it later. ' +
-        'Needs confirm:true.',
+        'Provision a data store on a Roxyon hosting account. engine "mysql" (MySQL/MariaDB, default; localhost:3306), ' +
+        '"postgres" (PostgreSQL 15 inside the account, localhost:5432; the first one installs it in a few minutes) or ' +
+        '"redis" (Redis inside the account, 127.0.0.1:6379 with a password, 128 MB, saved to disk; one per account; give ' +
+        'apps REDIS_URL=redis://:<password>@127.0.0.1:6379). Every hosting account has all three: never tell the user to ' +
+        'get a VPS or an outside service for PostgreSQL or Redis. The name is prefixed with the account\'s own username — ' +
+        'pass just the suffix, e.g. "wordpress" (for Redis any short name, e.g. "cache"). The password is shown once in the ' +
+        'result; there is no way to retrieve it later. Needs confirm:true.',
       inputSchema: {
         name: z.string().describe('DB name suffix: lowercase letters, digits, underscore.'),
         subscription: z.string().optional(),
         password: z.string().optional().describe('Omit to have Roxyon generate one.'),
-        engine: z.enum(['mysql', 'postgres']).optional().describe('mysql (default) or postgres.'),
+        engine: z.enum(['mysql', 'postgres', 'redis']).optional().describe('mysql (default), postgres or redis.'),
         confirm: z.boolean().optional(),
       },
     },
@@ -726,7 +735,7 @@ export function registerTools(server: McpServer): void {
       guard(async () => {
         const session = await getSession();
         if (!args.confirm) {
-          return text(`Would create ${args.engine === 'postgres' ? 'PostgreSQL' : 'MySQL'} database "${args.name}". Pass confirm:true.`, {
+          return text(`Would create ${engineLabel(args.engine)} "${args.name}". Pass confirm:true.`, {
             dryRun: true,
           });
         }
@@ -736,9 +745,8 @@ export function registerTools(server: McpServer): void {
           password: args.password,
           ...(args.engine ? { engine: args.engine } : {}),
         });
-        const pg = r.engine === 'postgres';
         const body = [
-          `${r.status === 'active' ? '✓' : '»'} ${pg ? 'PostgreSQL' : 'MySQL'} database ${r.name} (user ${r.username}) — ${r.status}.`,
+          `${r.status === 'active' ? '✓' : '»'} ${engineLabel(r.engine)} ${r.name}${r.username ? ` (user ${r.username})` : ''} — ${r.status}.`,
           r.password ? `\nPassword (save this now — shown once):\n${r.password}` : '',
           r.host ? `Host: ${r.host}${r.port ? `:${r.port}` : ''}` : '',
           r.note ?? '',
@@ -774,7 +782,7 @@ export function registerTools(server: McpServer): void {
         const rows = await session.roxyon.databases.list(subscription);
         const body = rows.length
           ? rows
-              .map((d) => `- ${d.Name} [${d.objectId}] — ${d.Engine === 'postgres' ? 'PostgreSQL' : 'MySQL'}, ${d.Status} (user ${d.Username})`)
+              .map((d) => `- ${d.Name} [${d.objectId}] — ${engineLabel(d.Engine)}, ${d.Status}${d.Engine === 'redis' ? ' (127.0.0.1:6379)' : ` (user ${d.Username})`}`)
               .join('\n')
           : '(no databases)';
         return text(body, { databases: rows });

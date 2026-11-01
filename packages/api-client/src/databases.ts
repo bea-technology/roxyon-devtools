@@ -10,15 +10,16 @@ export interface CreateDatabaseInput {
   password?: string;
   /**
    * `mysql` (default: MySQL/MariaDB on the shared cluster) or `postgres` (PostgreSQL 15 inside the account's own hosting
-   * container, at localhost:5432; the first one installs it, a few minutes). Every hosting account has both.
+   * container, at localhost:5432; the first one installs it, a few minutes) or `redis` (one Redis per account, 127.0.0.1:6379,
+   * password-protected). Every hosting account has all three.
    */
-  engine?: 'mysql' | 'postgres';
+  engine?: 'mysql' | 'postgres' | 'redis';
 }
 
 export interface CreateDatabaseResult {
   ok: boolean;
   objectId: string;
-  engine?: 'mysql' | 'postgres';
+  engine?: 'mysql' | 'postgres' | 'redis';
   port?: number;
   /** How to connect (PostgreSQL: the URL shape and the no-password psql login over SSH). */
   note?: string;
