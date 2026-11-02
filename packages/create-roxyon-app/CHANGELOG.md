@@ -1,5 +1,11 @@
 # create-roxyon-app
 
+## 0.1.9
+
+### Patch Changes
+
+- @roxyon/deploy-core@0.3.6
+
 ## 0.1.8
 
 ### Patch Changes
