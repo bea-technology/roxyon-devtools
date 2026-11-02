@@ -522,8 +522,9 @@ export function registerTools(server: McpServer): void {
       title: 'Roxyon: add a subdomain / host',
       description:
         'Provision a host — DNS + web server + automatic HTTPS. The host must be a subdomain ' +
-        'of a domain the account already hosts (or a *.roxyon.com subdomain). Returns while it ' +
-        'is still coming up; TLS follows a minute or two later. Needs confirm:true.',
+        'of a domain the account already hosts, or a free <name>.roxyon.app (one word, for anyone, no ' +
+        "hosting plan needed: Roxyon hosts it isolated, PHP included). roxyon.com names are Roxyon's own. " +
+        'Returns while it is still coming up; TLS follows a minute or two later. Needs confirm:true.',
       inputSchema: {
         host: z.string().describe('The full hostname, e.g. promo.mycompany.com'),
         subscription: z
@@ -576,7 +577,7 @@ export function registerTools(server: McpServer): void {
       title: 'Roxyon: deploy generated files',
       description: [
         'Publish a set of files you generated (HTML/CSS/JS/assets) to a host on the account.',
-        'The host must already exist (roxyon_add_domain, or an existing site). Overlay by',
+        'The host must already exist (roxyon_add_domain, e.g. a free <name>.roxyon.app, or an existing site). Overlay by',
         'default — pass clean:true to replace the whole document root. Needs confirm:true.',
         `Limits: ${MAX_FILES} files, ${(MAX_FILE_BYTES / 1024) | 0} KB per file,`,
         `${(MAX_TOTAL_BYTES / 1024 / 1024).toFixed(1)} MB total (base64-encode binaries).`,

@@ -11,7 +11,7 @@ do (same restriction as `roxyon_init` / `roxyon_deploy`).
 
 1. Create the host if it doesn't already exist (`roxyon_add_domain`'s own
    logic — a subdomain of a domain the account already hosts, or
-   `*.roxyon.com`), with a PHP-capable vhost (`phpVersion`, default `8.3`).
+   a free `<name>.roxyon.app`), with a PHP-capable vhost (`phpVersion`, default `8.3`).
 2. Create a database (`roxyon_database_create` under the hood) — the name is
    derived from the host unless you pass `dbName`.
 3. Download WordPress core and write a working `wp-config.php` against that

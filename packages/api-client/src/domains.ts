@@ -7,7 +7,7 @@ export interface Domain {
 }
 
 export interface CreateDomainInput {
-  /** FQDN to host — a subdomain of a domain the account already hosts, or `*.roxyon.com`. */
+  /** FQDN to host — a subdomain of a domain the account already hosts, or a free `<name>.roxyon.app`. */
   host: string;
   /** Subscription to attach it to. Omit when the account has exactly one. */
   subscription?: string;

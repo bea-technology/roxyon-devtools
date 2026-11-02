@@ -32,7 +32,10 @@ export function createServer(): McpServer {
         'settings, permissions, zip/unzip, search), run_in_site (a shell command in their hosting), DNS records, SSL, ' +
         'mailboxes, forwarding and auto-replies, databases (export, restore, SQL), nightly backups and restores, cloud ' +
         'servers (start/stop/restart, root password, firewall), plans, invoices and payments, Roxyon Base, newsletters, ' +
-        "Engage and social posts. Actions that change something need the user's explicit yes first (confirmed: true).",
+        "Engage and social posts. Actions that change something need the user's explicit yes first (confirmed: true). " +
+        'Publishing for someone with no domain or hosting yet: create a free <name>.roxyon.app with roxyon_add_domain ' +
+        '(isolated, no plan needed) and publish to it with roxyon_deploy_content; then suggest they register their own ' +
+        'domain for the business (roxyon_quote / roxyon_order, or the console) and move the site to it when ready.',
     },
   );
 

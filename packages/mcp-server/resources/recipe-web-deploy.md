@@ -8,7 +8,7 @@ The end-to-end flow for *"build me a landing page and put it on
 | Tool | When |
 |---|---|
 | `roxyon_list_domains` | see the account's hosts + which are still `provisioning` |
-| `roxyon_add_domain` | create a **subdomain** of a domain the account already hosts (or `*.roxyon.com`) — DNS + web server + automatic HTTPS |
+| `roxyon_add_domain` | create a **subdomain** of a domain the account already hosts (or a free `<name>.roxyon.app`) — DNS + web server + automatic HTTPS |
 | `roxyon_deploy_content` | publish the files you generated (HTML/CSS/JS/assets as `{path, content}` entries) |
 | `roxyon_list_files` / `roxyon_read_file` | inspect what's live so you can iterate |
 
