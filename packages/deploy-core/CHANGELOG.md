@@ -1,5 +1,12 @@
 # @roxyon/deploy-core
 
+## 0.3.6
+
+### Patch Changes
+
+- Updated dependencies [46856ff]
+  - @roxyon/api-client@0.8.1
+
 ## 0.3.5
 
 ### Patch Changes

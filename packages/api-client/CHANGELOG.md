@@ -1,5 +1,11 @@
 # @roxyon/api-client
 
+## 0.8.1
+
+### Patch Changes
+
+- 46856ff: Free `<name>.roxyon.app` sites: `roxyon_add_domain` creates one for anyone (isolated hosting, no plan needed) and `roxyon_deploy_content` publishes to it; the instructions make it the default for people without a domain and suggest registering their own. roxyon.com names are Roxyon's own.
+
 ## 0.8.0
 
 ### Minor Changes

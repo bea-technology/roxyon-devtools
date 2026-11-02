@@ -1,5 +1,17 @@
 # @roxyon/mcp
 
+## 0.11.0
+
+### Minor Changes
+
+- 46856ff: Free `<name>.roxyon.app` sites: `roxyon_add_domain` creates one for anyone (isolated hosting, no plan needed) and `roxyon_deploy_content` publishes to it; the instructions make it the default for people without a domain and suggest registering their own. roxyon.com names are Roxyon's own.
+
+### Patch Changes
+
+- Updated dependencies [46856ff]
+  - @roxyon/api-client@0.8.1
+  - @roxyon/deploy-core@0.3.6
+
 ## 0.10.0
 
 ### Minor Changes
