@@ -913,7 +913,9 @@ export function registerTools(server: McpServer): void {
       description:
         "Reset a subscription's shell password — used for SSH, SFTP, and the file manager. Changing " +
         'it signs out anything using the old one. The password is shown once in the result; the ' +
-        'platform never stores or re-shows it. Needs confirm:true.',
+        'platform never stores or re-shows it. Needs confirm:true. Connect with ' +
+        '`ssh -p 2222 <username>@ssh.roxyon.com` (SFTP: the same host, port 2222), where <username> is the ' +
+        "hosting account's username; port 22 on that host is not for clients.",
       inputSchema: {
         subscription: z.string().optional(),
         password: z
